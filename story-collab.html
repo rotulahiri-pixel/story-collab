@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Collaborative Story Builder</title>
+    <!-- Appwrite SDK from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/appwrite@13.0.2"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: system-ui, sans-serif; background: #f5f5f5; color: #333; padding: 1rem; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .hidden { display: none !important; }
+        h1, h2 { margin: 1rem 0; }
+        button { padding: 0.6rem 1.2rem; border: none; border-radius: 8px; background: #4a90e2; color: white; font-weight: bold; cursor: pointer; }
+        button:disabled { background: #aaa; cursor: not-allowed; }
+        .form-group { margin-bottom: 1rem; }
+        input, textarea { width: 100%; padding: 0.6rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; }
+        .card { background: white; border-radius: 12px; padding: 1rem; margin: 1rem 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1); cursor: pointer; }
+        .word-counter { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+        .progress-bar { flex: 1; height: 8px; background: #eee; border-radius: 4px; overflow: hidden; }
+        .progress-fill { height: 100%; background: #4a90e2; transition: width 0.2s; }
+        .progress-fill.over-limit { background: #e74c3c; }
+        .warning { color: #e74c3c; font-size: 0.9rem; }
+        .role-badge { display: inline-block; padding: 0.2rem 0.6rem; background: #eee; border-radius: 20px; font-size: 0.8rem; }
+        .grid { display: grid; gap: 1rem; }
+        @media (min-width: 600px) { .grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <!-- Auth screen -->
+    <div id="authScreen">
+        <h1>📚 Story Collab</h1>
+        <div id="loginForm">
+            <h2>Login</h2>
+            <div class="form-group"><input type="email" id="loginEmail" placeholder="Email" required></div>
+            <div class="form-group"><input type="password" id="loginPassword" placeholder="Password"></div>
+            <button id="loginBtn">Login</button>
+            <p style="margin-top:0.5rem">No account? <a href="#" id="showRegister">Register</a></p>
+        </div>
+        <div id="registerForm" class="hidden">
+            <h2>Register</h2>
+            <div class="form-group"><input type="text" id="regName" placeholder="Name"></div>
+            <div class="form-group"><input type="email" id="regEmail" placeholder="Email" required></div>
+            <div class="form-group"><input type="password" id="regPassword" placeholder="Password (min 8 chars)"></div>
+            <button id="registerBtn">Register</button>
+            <p style="margin-top:0.5rem"><a href="#" id="showLogin">Back to Login</a></p>
+        </div>
+    </div>
+
+    <!-- Main app (after login) -->
+    <div id="appScreen" class="hidden">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h1>📚 Story Collab</h1>
+            <button id="logoutBtn" style="background:#e74c3c;">Logout</button>
+        </div>
+
+        <!-- Landing Page -->
+        <div id="landingView">
+            <h2>Welcome!</h2>
+            <button id="createStoryBtn">+ New Story</button>
+            <div id="storiesList" class="grid" style="margin-top:1rem"></div>
+            <div id="createStoryForm" class="hidden card" style="margin-top:1rem">
+                <h3>Create New Story</h3>
+                <input type="text" id="newStoryTitle" placeholder="Story title">
+                <input type="text" id="newStoryGenre" placeholder="Genre (optional)">
+                <textarea id="newStoryDesc" rows="2" placeholder="Short description"></textarea>
+                <button id="saveNewStoryBtn">Create Story</button>
+                <button id="cancelCreateBtn" style="background:#aaa;">Cancel</button>
+            </div>
+        </div>
+
+        <!-- Story View (read) -->
+        <div id="storyView" class="hidden">
+            <button id="backToLandingBtn">← Back to Stories</button>
+            <h2 id="storyTitle"></h2>
+            <p id="storyGenre"></p>
+            <div id="chaptersContainer"></div>
+            <button id="contributeBtn" style="margin:1rem 0">✍️ Contribute (Writer's Desk)</button>
+        </div>
+
+        <!-- Writer's Desk -->
+        <div id="writerDesk" class="hidden">
+            <button id="backToStoryBtn">← Back to Story</button>
+            <h2>Writer's Desk</h2>
+            <p><strong>Story:</strong> <span id="deskStoryTitle"></span></p>
+            <div class="word-counter">
+                <span>Words: <strong id="wordCountDisplay">0</strong>/300</span>
+                <div class="progress-bar"><div id="wordProgress" class="progress-fill" style="width:0%"></div></div>
+            </div>
+            <textarea id="chapterText" rows="12" placeholder="Continue the story in up to 300 words..."></textarea>
+            <p id="wordWarning" class="warning hidden">⚠️ Too many words. Please shorten.</p>
+            <div style="display:flex; gap:1rem; margin-top:1rem;">
+                <button id="saveDraftBtn">💾 Save Draft</button>
+                <button id="submitChapterBtn">📤 Submit Chapter</button>
+            </div>
+            <p id="draftStatus" style="margin-top:0.5rem; font-style:italic;"></p>
+            <div id="previousChapters" style="margin-top:2rem">
+                <h3>Previous Chapters</h3>
+                <div id="prevChaptersList"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ===== CONFIGURATION - REPLACE THESE VALUES =====
+    const APPWRITE_ENDPOINT = 'https://fra.cloud.appwrite.io/v1';   // your Appwrite endpoint
+    const PROJECT_ID = 'rotulahiri';                       // your Appwrite project ID
+    const DATABASE_ID = 'stories_db';                            // your database ID
+    const STORIES_COLLECTION = 'stories';                        // stories collection ID
+    const CHAPTERS_COLLECTION = 'chapters';                      // chapters collection ID
+    const DRAFTS_COLLECTION = 'drafts';                          // drafts collection ID
+    // =================================================
+
+    // Initialize Appwrite
+    const client = new Appwrite.Client();
+    client.setEndpoint(APPWRITE_ENDPOINT).setProject(PROJECT_ID);
+    const account = new Appwrite.Account(client);
+    const databases = new Appwrite.Databases(client);
+
+    // App state
+    let currentUser = null;
+    let currentView = 'landing'; // landing, story, writer
+    let currentStoryId = null;
+    let currentStory = null;
+
+    // DOM elements
+    const authScreen = document.getElementById('authScreen');
+    const appScreen = document.getElementById('appScreen');
+    const landingView = document.getElementById('landingView');
+    const storyView = document.getElementById('storyView');
+    const writerDesk = document.getElementById('writerDesk');
+    const wordCountDisplay = document.getElementById('wordCountDisplay');
+    const wordProgress = document.getElementById('wordProgress');
+    const wordWarning = document.getElementById('wordWarning');
+    const chapterText = document.getElementById('chapterText');
+    const draftStatus = document.getElementById('draftStatus');
+
+    // Auth toggle
+    document.getElementById('showRegister').addEventListener('click', (e) => {
+        e.preventDefault();
+        document.getElementById('loginForm').classList.add('hidden');
+        document.getElementById('registerForm').classList.remove('hidden');
+    });
+    document.getElementById('showLogin').addEventListener('click', (e) => {
+        e.preventDefault();
+        document.getElementById('registerForm').classList.add('hidden');
+        document.getElementById('loginForm').classList.remove('hidden');
+    });
+
+    // Login
+    document.getElementById('loginBtn').addEventListener('click', async () => {
+        const email = document.getElementById('loginEmail').value;
+        const password = document.getElementById('loginPassword').value;
+        try {
+            await account.createEmailPasswordSession(email, password);
+            await loadUser();
+            showApp();
+        } catch (err) {
+            alert('Login failed: ' + err.message);
+        }
+    });
+
+    // Register
+    document.getElementById('registerBtn').addEventListener('click', async () => {
+        const name = document.getElementById('regName').value || 'Writer';
+        const email = document.getElementById('regEmail').value;
+        const password = document.getElementById('regPassword').value;
+        if (password.length < 8) { alert('Password must be at least 8 characters'); return; }
+        try {
+            await account.create(Appwrite.ID.unique(), email, password, name);
+            await account.createEmailPasswordSession(email, password);
+            await loadUser();
+            showApp();
+        } catch (err) {
+            alert('Registration failed: ' + err.message);
+        }
+    });
+
+    // Logout
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+        await account.deleteSession('current');
+        currentUser = null;
+        authScreen.classList.remove('hidden');
+        appScreen.classList.add('hidden');
+    });
+
+    // Load current user
+    async function loadUser() {
+        currentUser = await account.get();
+    }
+
+    function showApp() {
+        authScreen.classList.add('hidden');
+        appScreen.classList.remove('hidden');
+        goToLanding();
+    }
+
+    // View navigation
+    function showView(view) {
+        landingView.classList.add('hidden');
+        storyView.classList.add('hidden');
+        writerDesk.classList.add('hidden');
+        document.getElementById(view + 'View').classList.remove('hidden');
+        currentView = view;
+    }
+
+    function goToLanding() { showView('landing'); loadStories(); }
+    function goToStory(storyId) { currentStoryId = storyId; showView('story'); loadStoryView(); }
+    function goToWriterDesk() { showView('writer'); loadWriterDesk(); }
+
+    // ========== LANDING PAGE ==========
+    document.getElementById('createStoryBtn').addEventListener('click', () => {
+        document.getElementById('createStoryForm').classList.remove('hidden');
+    });
+    document.getElementById('cancelCreateBtn').addEventListener('click', () => {
+        document.getElementById('createStoryForm').classList.add('hidden');
+    });
+    document.getElementById('saveNewStoryBtn').addEventListener('click', async () => {
+        const title = document.getElementById('newStoryTitle').value.trim();
+        const genre = document.getElementById('newStoryGenre').value.trim();
+        const desc = document.getElementById('newStoryDesc').value.trim();
+        if (!title) { alert('Title is required'); return; }
+        try {
+            await databases.createDocument(DATABASE_ID, STORIES_COLLECTION, Appwrite.ID.unique(), {
+                title, genre, description: desc,
+                creatorId: currentUser.$id,
+                creatorName: currentUser.name,
+                editorId: '',
+                status: 'active'
+            });
+            document.getElementById('createStoryForm').classList.add('hidden');
+            document.getElementById('newStoryTitle').value = '';
+            document.getElementById('newStoryGenre').value = '';
+            document.getElementById('newStoryDesc').value = '';
+            loadStories();
+        } catch (err) {
+            alert('Could not create story: ' + err.message);
+        }
+    });
+
+    async function loadStories() {
+        const listEl = document.getElementById('storiesList');
+        listEl.innerHTML = 'Loading...';
+        try {
+            const res = await databases.listDocuments(DATABASE_ID, STORIES_COLLECTION);
+            if (res.documents.length === 0) {
+                listEl.innerHTML = '<p>No stories yet. Create one!</p>';
+                return;
+            }
+            listEl.innerHTML = res.documents.map(story => `
+                <div class="card" onclick="goToStory('${story.$id}')">
+                    <h3>${story.title}</h3>
+                    <p>${story.description || ''}</p>
+                    <small>By ${story.creatorName} · ${story.genre || 'No genre'}</small>
+                </div>
+            `).join('');
+        } catch (err) {
+            listEl.innerHTML = 'Error loading stories.';
+        }
+    }
+
+    // ========== STORY VIEW ==========
+    document.getElementById('backToLandingBtn').addEventListener('click', goToLanding);
+    document.getElementById('contributeBtn').addEventListener('click', goToWriterDesk);
+
+    async function loadStoryView() {
+        document.getElementById('chaptersContainer').innerHTML = 'Loading...';
+        try {
+            currentStory = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId);
+            document.getElementById('storyTitle').textContent = currentStory.title;
+            document.getElementById('storyGenre').textContent = currentStory.genre ? 'Genre: ' + currentStory.genre : '';
+            const chaptersRes = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, [
+                Appwrite.Query.equal('storyId', currentStoryId),
+                Appwrite.Query.orderAsc('chapterNumber')
+            ]);
+            const chapters = chaptersRes.documents;
+            if (chapters.length === 0) {
+                document.getElementById('chaptersContainer').innerHTML = '<p>No chapters yet. Be the first to contribute!</p>';
+                return;
+            }
+            document.getElementById('chaptersContainer').innerHTML = chapters.map(ch => `
+                <div class="card" style="cursor:default">
+                    <h4>Chapter ${ch.chapterNumber} — by ${ch.authorName}</h4>
+                    <p style="white-space:pre-wrap">${ch.content}</p>
+                    <small>${new Date(ch.$createdAt).toLocaleString()}</small>
+                </div>
+            `).join('');
+        } catch (err) {
+            document.getElementById('chaptersContainer').innerHTML = 'Error loading story.';
+        }
+    }
+
+    // ========== WRITER'S DESK ==========
+    document.getElementById('backToStoryBtn').addEventListener('click', () => goToStory(currentStoryId));
+
+    // Word counter
+    chapterText.addEventListener('input', () => {
+        const text = chapterText.value;
+        const words = text.trim().split(/\s+/).filter(w => w.length > 0);
+        const count = words.length;
+        wordCountDisplay.textContent = count;
+        const pct = Math.min((count / 300) * 100, 100);
+        wordProgress.style.width = pct + '%';
+        wordProgress.classList.toggle('over-limit', count > 300);
+        wordWarning.classList.toggle('hidden', count <= 300);
+    });
+
+    // Save draft
+    document.getElementById('saveDraftBtn').addEventListener('click', saveDraft);
+    async function saveDraft() {
+        const content = chapterText.value;
+        draftStatus.textContent = 'Saving...';
+        try {
+            // Check if draft already exists for this story+user
+            const existing = await databases.listDocuments(DATABASE_ID, DRAFTS_COLLECTION, [
+                Appwrite.Query.equal('storyId', currentStoryId),
+                Appwrite.Query.equal('authorId', currentUser.$id)
+            ]);
+            if (existing.documents.length > 0) {
+                await databases.updateDocument(DATABASE_ID, DRAFTS_COLLECTION, existing.documents[0].$id, {
+                    content,
+                    wordCount: content.trim().split(/\s+/).filter(w => w.length > 0).length,
+                    lastModified: new Date().toISOString()
+                });
+            } else {
+                await databases.createDocument(DATABASE_ID, DRAFTS_COLLECTION, Appwrite.ID.unique(), {
+                    storyId: currentStoryId,
+                    authorId: currentUser.$id,
+                    content,
+                    wordCount: content.trim().split(/\s+/).filter(w => w.length > 0).length,
+                    lastModified: new Date().toISOString()
+                });
+            }
+            draftStatus.textContent = 'Draft saved at ' + new Date().toLocaleTimeString();
+        } catch (err) {
+            draftStatus.textContent = 'Error saving draft.';
+        }
+    }
+
+    // Submit chapter
+    document.getElementById('submitChapterBtn').addEventListener('click', async () => {
+        const content = chapterText.value.trim();
+        if (!content) { alert('Write something first.'); return; }
+        const wordCount = content.split(/\s+/).filter(w => w.length > 0).length;
+        if (wordCount > 300) { alert('Please shorten to 300 words or less.'); return; }
+        try {
+            // Determine next chapter number
+            const chaptersRes = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, [
+                Appwrite.Query.equal('storyId', currentStoryId)
+            ]);
+            const nextNumber = chaptersRes.documents.length + 1;
+            await databases.createDocument(DATABASE_ID, CHAPTERS_COLLECTION, Appwrite.ID.unique(), {
+                storyId: currentStoryId,
+                chapterNumber: nextNumber,
+                content,
+                authorId: currentUser.$id,
+                authorName: currentUser.name,
+                wordCount,
+                status: 'published' // immediately published
+            });
+            chapterText.value = '';
+            wordCountDisplay.textContent = '0';
+            wordProgress.style.width = '0%';
+            wordProgress.classList.remove('over-limit');
+            wordWarning.classList.add('hidden');
+            draftStatus.textContent = 'Chapter submitted!';
+            // Also delete draft
+            const draftDocs = await databases.listDocuments(DATABASE_ID, DRAFTS_COLLECTION, [
+                Appwrite.Query.equal('storyId', currentStoryId),
+                Appwrite.Query.equal('authorId', currentUser.$id)
+            ]);
+            if (draftDocs.documents.length > 0) {
+                await databases.deleteDocument(DATABASE_ID, DRAFTS_COLLECTION, draftDocs.documents[0].$id);
+            }
+            // Reload story view and writer desk previous chapters
+            loadStoryView();
+            loadPreviousChapters();
+        } catch (err) {
+            alert('Error submitting chapter: ' + err.message);
+        }
+    });
+
+    async function loadWriterDesk() {
+        document.getElementById('deskStoryTitle').textContent = currentStory.title;
+        // Load draft if exists
+        try {
+            const drafts = await databases.listDocuments(DATABASE_ID, DRAFTS_COLLECTION, [
+                Appwrite.Query.equal('storyId', currentStoryId),
+                Appwrite.Query.equal('authorId', currentUser.$id)
+            ]);
+            if (drafts.documents.length > 0) {
+                chapterText.value = drafts.documents[0].content;
+                // trigger word count update
+                chapterText.dispatchEvent(new Event('input'));
+                draftStatus.textContent = 'Loaded draft from ' + new Date(drafts.documents[0].lastModified).toLocaleString();
+            } else {
+                chapterText.value = '';
+                draftStatus.textContent = '';
+            }
+        } catch (err) { /* ignore */ }
+        loadPreviousChapters();
+    }
+
+    async function loadPreviousChapters() {
+        const prevList = document.getElementById('prevChaptersList');
+        prevList.innerHTML = 'Loading...';
+        try {
+            const res = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, [
+                Appwrite.Query.equal('storyId', currentStoryId),
+                Appwrite.Query.orderAsc('chapterNumber')
+            ]);
+            prevList.innerHTML = res.documents.map(ch => `
+                <div class="card" style="cursor:default; font-size:0.9rem;">
+                    <strong>Ch.${ch.chapterNumber}</strong> — ${ch.authorName}: ${ch.content.substring(0, 100)}...
+                </div>
+            `).join('');
+        } catch (err) {
+            prevList.innerHTML = 'Could not load previous chapters.';
+        }
+    }
+
+    // On page load check for existing session
+    (async () => {
+        try {
+            const user = await account.get();
+            if (user) {
+                currentUser = user;
+                showApp();
+            }
+        } catch (e) {
+            // not logged in
+        }
+    })();
+</script>
+</body>
+</html>
