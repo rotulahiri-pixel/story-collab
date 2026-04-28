@@ -143,7 +143,7 @@
         const email = document.getElementById('loginEmail').value;
         const password = document.getElementById('loginPassword').value;
         try {
-            await account.createEmailPasswordSession(email, password);
+            await account.createEmailSession(email, password);
             await loadUser();
             showApp();
         } catch (err) {
@@ -159,7 +159,7 @@
         if (password.length < 8) { alert('Password must be at least 8 characters'); return; }
         try {
             await account.create(Appwrite.ID.unique(), email, password, name);
-            await account.createEmailPasswordSession(email, password);
+            await account.createEmailSession(email, password);
             await loadUser();
             showApp();
         } catch (err) {
