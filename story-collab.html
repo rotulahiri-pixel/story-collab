@@ -236,7 +236,7 @@
         const password = document.getElementById('loginPassword').value;
         if (!email || !password) { alert('Email and password required'); return; }
         try {
-            await account.createEmailSession(email, password);
+            await account.createEmailPasswordSession(email, password);
             currentUser = await account.get();
             showApp();
         } catch (err) {
@@ -253,7 +253,7 @@
         if (!email) { alert('Email required'); return; }
         try {
             await account.create(Appwrite.ID.unique(), email, password, name);
-            await account.createEmailSession(email, password);
+            await account.createEmailPasswordSession(email, password);
             currentUser = await account.get();
             showApp();
         } catch (err) {
