@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>RelayTale - Where Writers Create Stories By Turn</title>
-    <script src="https://cdn.jsdelivr.net/npm/appwrite@14.0.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/appwrite@13.0.2"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: system-ui, sans-serif; background: #f8f9fa; color: #333; padding: 1rem; }
@@ -236,7 +236,7 @@
         const password = document.getElementById('loginPassword').value;
         if (!email || !password) { alert('Email and password required'); return; }
         try {
-            await account.createEmailPasswordSession(email, password);
+            await account.createEmailSession(email, password);
             currentUser = await account.get();
             showApp();
         } catch (err) {
@@ -253,7 +253,7 @@
         if (!email) { alert('Email required'); return; }
         try {
             await account.create(Appwrite.ID.unique(), email, password, name);
-            await account.createEmailPasswordSession(email, password);
+            await account.createEmailSession(email, password);
             currentUser = await account.get();
             showApp();
         } catch (err) {
