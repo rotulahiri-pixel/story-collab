@@ -3,44 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>RelayTale - Collaborative Story Builder</title>
-    <script src="https://cdn.jsdelivr.net/npm/appwrite@13.0.2"></script>
+    <title>RelayTale - Where Writers Create Stories By Turn</title>
+    <script src="https://cdn.jsdelivr.net/npm/appwrite@14.0.0"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: system-ui, sans-serif; background: #f5f5f5; color: #333; padding: 1rem; }
-        .container { max-width: 800px; margin: 0 auto; }
+        body { font-family: system-ui, sans-serif; background: #f8f9fa; color: #333; padding: 1rem; }
+        .container { max-width: 900px; margin: 0 auto; }
         .hidden { display: none !important; }
-        h1, h2 { margin: 1rem 0; }
-        button { padding: 0.6rem 1.2rem; border: none; border-radius: 8px; background: #4a90e2; color: white; font-weight: bold; cursor: pointer; margin: 0.25rem; }
+        h1, h2, h3 { margin: 0.8rem 0; }
+        button { padding: 0.5rem 1rem; border: none; border-radius: 8px; background: #5b6fe6; color: white; font-weight: 600; cursor: pointer; margin: 0.3rem; font-size: 0.9rem; }
         button:disabled { background: #aaa; cursor: not-allowed; }
         button.danger { background: #e74c3c; }
-        button.secondary { background: #aaa; }
+        button.success { background: #27ae60; }
+        button.outline { background: transparent; border: 2px solid #5b6fe6; color: #5b6fe6; }
         .form-group { margin-bottom: 1rem; }
-        input, textarea { width: 100%; padding: 0.6rem; border: 1px solid #ccc; border-radius: 8px; font-size: 1rem; margin-bottom: 0.5rem; }
-        .card { background: white; border-radius: 12px; padding: 1rem; margin: 1rem 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-        .card h3, .card h4 { margin-bottom: 0.5rem; }
-        .word-counter { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+        input, textarea { width: 100%; padding: 0.6rem; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; }
+        textarea { resize: vertical; }
+        .card { background: white; border-radius: 12px; padding: 1.2rem; margin: 1rem 0; box-shadow: 0 2px 8px rgba(0,0,0,0.06); transition: transform 0.1s; }
+        .card:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
+        @media (max-width: 600px) { .card-grid { grid-template-columns: 1fr; } }
+        .word-counter { display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.5rem; }
         .progress-bar { flex: 1; height: 8px; background: #eee; border-radius: 4px; overflow: hidden; }
-        .progress-fill { height: 100%; background: #4a90e2; transition: width 0.2s; }
+        .progress-fill { height: 100%; background: #5b6fe6; transition: width 0.2s; }
         .progress-fill.over-limit { background: #e74c3c; }
         .warning { color: #e74c3c; font-size: 0.9rem; }
-        .grid { display: grid; gap: 1rem; }
-        .flex-between { display: flex; justify-content: space-between; align-items: center; }
-        @media (min-width: 600px) { .grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); } }
-        a { color: #4a90e2; text-decoration: underline; cursor: pointer; }
+        .success-msg { color: #27ae60; font-size: 0.9rem; }
+        .badge { display: inline-block; padding: 0.2rem 0.6rem; background: #eee; border-radius: 20px; font-size: 0.75rem; margin: 0.2rem; font-weight: 600; }
+        .badge.status-active { background: #d5f5e3; color: #27ae60; }
+        .badge.status-completed { background: #d6eaf8; color: #2980b9; }
+        .badge.writer { background: #e8daef; color: #8e44ad; }
+        .flex-row { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+        .flex-between { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
+        .heart-btn { background: none; border: none; font-size: 1.1rem; cursor: pointer; padding: 0.2rem 0.5rem; }
+        .heart-btn.liked { color: #e74c3c; }
+        .popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); z-index: 1000; max-width: 90%; max-height: 80vh; overflow-y: auto; }
+        .overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 999; }
+        .creator-section { border-left: 4px solid #5b6fe6; padding-left: 1rem; margin: 1rem 0; }
+        .tagline { color: #7f8c8d; font-style: italic; margin-bottom: 1.5rem; }
+        .header-section { text-align: center; padding: 2rem 0; }
+        @media (min-width: 768px) {
+            .card-grid { grid-template-columns: repeat(2, 1fr); }
+        }
     </style>
 </head>
 <body>
-<div class="container" id="appContainer">
-    <!-- Auth screen -->
+<div class="container">
+    <!-- Auth Screen -->
     <div id="authScreen">
-        <h1>📚 RelayTale</h1>
+        <div class="header-section">
+            <h1>📚 RelayTale</h1>
+            <p class="tagline">Where writers create stories by turn</p>
+        </div>
         <div id="loginForm">
             <h2>Login</h2>
             <div class="form-group"><input type="email" id="loginEmail" placeholder="Email" required></div>
             <div class="form-group"><input type="password" id="loginPassword" placeholder="Password"></div>
             <button id="loginBtn">Login</button>
-            <p style="margin-top:0.5rem">No account? <a id="showRegisterLink">Register</a></p>
+            <button id="googleLoginBtn" class="outline">🔵 Login with Google</button>
+            <p style="margin-top:0.5rem">No account? <a href="#" id="showRegister">Register</a></p>
         </div>
         <div id="registerForm" class="hidden">
             <h2>Register</h2>
@@ -48,74 +69,113 @@
             <div class="form-group"><input type="email" id="regEmail" placeholder="Email" required></div>
             <div class="form-group"><input type="password" id="regPassword" placeholder="Password (min 8 chars)"></div>
             <button id="registerBtn">Register</button>
-            <p style="margin-top:0.5rem"><a id="showLoginLink">Back to Login</a></p>
+            <p style="margin-top:0.5rem"><a href="#" id="showLogin">Back to Login</a></p>
         </div>
+        <button id="libraryBtn" class="outline" style="margin-top:1.5rem; width:100%;">📚 LIBRARY (Read Stories)</button>
     </div>
 
-    <!-- Main app (after login) -->
+    <!-- Main App -->
     <div id="appScreen" class="hidden">
-        <div class="flex-between">
-            <h1>📚 RelayTale</h1>
-            <button id="logoutBtn" class="danger">Logout</button>
+        <div class="flex-between" style="margin-bottom:1rem;">
+            <div>
+                <h1 style="display:inline;">📚 RelayTale</h1>
+                <p class="tagline" style="display:inline; margin-left:1rem;">Where writers create stories by turn</p>
+            </div>
+            <div class="flex-row">
+                <span id="loggedInUser" class="badge"></span>
+                <button id="homeBtn">🏠 Home</button>
+            </div>
         </div>
 
-        <!-- Landing View -->
+        <!-- Landing View (Index) -->
         <div id="landingView">
-            <h2>Welcome!</h2>
-            <button id="createStoryBtn">+ New Story</button>
-            <div id="storiesList" class="grid" style="margin-top:1rem"></div>
-            <div id="createStoryForm" class="hidden card" style="margin-top:1rem">
-                <h3>Create New Story</h3>
-                <input type="text" id="newStoryTitle" placeholder="Story title">
-                <input type="text" id="newStoryGenre" placeholder="Genre (optional)">
-                <textarea id="newStoryDesc" rows="2" placeholder="Short description"></textarea>
-                <button id="saveNewStoryBtn">Create Story</button>
-                <button id="cancelCreateBtn" class="secondary">Cancel</button>
+            <div class="flex-between">
+                <h2>Story Index</h2>
+                <div class="flex-row">
+                    <span id="totalVisits" class="badge">📊 0 visits</span>
+                    <button id="creatorDashboardBtn" class="hidden">⚙️ Creator Dashboard</button>
+                </div>
             </div>
+            <div id="storiesList" class="card-grid"></div>
         </div>
 
         <!-- Story View -->
         <div id="storyView" class="hidden">
-            <button id="backToLandingBtn">← Back to Stories</button>
-            <h2 id="storyTitle"></h2>
-            <p id="storyGenre"></p>
+            <button id="backToIndexBtn">← Back to Index</button>
+            <div id="storyHeader" class="card"></div>
             <div id="chaptersContainer"></div>
-            <button id="contributeBtn" style="margin:1rem 0">✍️ Contribute (Writer's Desk)</button>
+            <button id="contributeBtn" class="success hidden">✍️ Contribute (It's Your Turn!)</button>
+            <button id="waitingBtn" class="hidden" disabled>⏳ Waiting for Your Turn</button>
+            
+            <!-- Invite Section (only for creator) -->
+            <div id="inviteSection" class="invite-section hidden">
+                <h3>Invite Writers</h3>
+                <div class="flex-row">
+                    <input type="text" id="inviteIdentifier" placeholder="Writer's name or ID" style="flex:1;">
+                    <button id="sendInviteBtn">📨 Invite</button>
+                </div>
+                <p style="font-size:0.8rem; color:#7f8c8d;">Set access password for invited writers:</p>
+                <div class="flex-row">
+                    <input type="text" id="accessPassword" placeholder="Story access password" style="flex:1;">
+                    <button id="setPasswordBtn">🔒 Set Password</button>
+                </div>
+                <div id="inviteList" style="margin-top:1rem;"></div>
+            </div>
         </div>
 
         <!-- Writer's Desk -->
         <div id="writerDesk" class="hidden">
-            <button id="backToStoryBtn">← Back to Story</button>
+            <div class="flex-between">
+                <div class="flex-row">
+                    <button id="backToStoryBtn">← Back to Story</button>
+                    <button id="newStoryFromDeskBtn" class="success hidden">+ New Story</button>
+                </div>
+            </div>
             <h2>Writer's Desk</h2>
             <p><strong>Story:</strong> <span id="deskStoryTitle"></span></p>
             <div class="word-counter">
                 <span>Words: <strong id="wordCountDisplay">0</strong>/300</span>
                 <div class="progress-bar"><div id="wordProgress" class="progress-fill" style="width:0%"></div></div>
             </div>
-            <textarea id="chapterText" rows="12" placeholder="Continue the story in up to 300 words..."></textarea>
+            <textarea id="chapterText" rows="18" placeholder="Continue the story in up to 300 words..."></textarea>
             <p id="wordWarning" class="warning hidden">⚠️ Too many words. Please shorten.</p>
-            <div style="display:flex; gap:1rem; margin-top:1rem;">
+            <div style="display:flex; gap:1rem; margin-top:1rem; flex-wrap:wrap;">
                 <button id="saveDraftBtn">💾 Save Draft</button>
-                <button id="submitChapterBtn">📤 Submit Chapter</button>
+                <button id="submitChapterBtn" class="success">📤 Submit Session</button>
             </div>
             <p id="draftStatus" style="margin-top:0.5rem; font-style:italic;"></p>
-            <div id="previousChapters" style="margin-top:2rem">
-                <h3>Previous Chapters</h3>
+            <div id="previousSessions" style="margin-top:2rem">
+                <h3>Previous Sessions</h3>
+                <div id="lastSessionCard" class="card hidden" style="background:#fef9e7;"></div>
                 <div id="prevChaptersList"></div>
             </div>
         </div>
-    </div>
-</div>
+
+        <!-- Creator Dashboard -->
+        <div id="creatorDashboard" class="hidden">
+            <button id="backToIndexFromDashboardBtn">← Back to Index</button>
+            <h2>⚙️ Creator Dashboard</h2>
+            <div id="creatorStoriesList" class="card-grid"></div>
+        </div>
+
+        <!-- Popup for long-press -->
+        <div id="popupOverlay" class="overlay hidden"></div>
+        <div id="popupContent" class="popup hidden"></div>
+    </div></div>
+
 
 <script>
-    // ===== CONFIGURATION - REPLACE THESE VALUES =====
+    // ===== CONFIGURATION =====
     const APPWRITE_ENDPOINT = 'https://fra.cloud.appwrite.io/v1';
-    const PROJECT_ID = 'rotulahiri';  // ← REPLACE THIS
+    const PROJECT_ID = 'rotulahiri';
     const DATABASE_ID = 'stories_db';
     const STORIES_COLLECTION = 'stories';
     const CHAPTERS_COLLECTION = 'chapters';
     const DRAFTS_COLLECTION = 'drafts';
-    // =================================================
+    const INVITATIONS_COLLECTION = 'invitations';
+    const LIKES_COLLECTION = 'storyLikes';
+    const VISITS_COLLECTION = 'pageVisits';
+    // ==========================
 
     const client = new Appwrite.Client();
     client.setEndpoint(APPWRITE_ENDPOINT).setProject(PROJECT_ID);
@@ -123,28 +183,61 @@
     const databases = new Appwrite.Databases(client);
 
     let currentUser = null;
-    let currentStory = null;
     let currentStoryId = null;
+    let currentStory = null;
+
+    // DOM Elements
+    const authScreen = document.getElementById('authScreen');
+    const appScreen = document.getElementById('appScreen');
+    const landingView = document.getElementById('landingView');
+    const storyView = document.getElementById('storyView');
+    const writerDesk = document.getElementById('writerDesk');
+    const creatorDashboard = document.getElementById('creatorDashboard');
 
     // Auth toggle
-    document.getElementById('showRegisterLink').addEventListener('click', (e) => {
+    document.getElementById('showRegister').addEventListener('click', (e) => {
         e.preventDefault();
         document.getElementById('loginForm').classList.add('hidden');
         document.getElementById('registerForm').classList.remove('hidden');
     });
-    document.getElementById('showLoginLink').addEventListener('click', (e) => {
+    document.getElementById('showLogin').addEventListener('click', (e) => {
         e.preventDefault();
         document.getElementById('registerForm').classList.add('hidden');
         document.getElementById('loginForm').classList.remove('hidden');
     });
 
-    // Login
+    // Library button (read without login)
+    document.getElementById('libraryBtn').addEventListener('click', () => {
+        currentUser = { $id: 'guest-' + Date.now(), name: 'Reader' };
+        authScreen.classList.add('hidden');
+        appScreen.classList.remove('hidden');
+        document.getElementById('loggedInUser').textContent = '📖 Library Reader';
+        document.getElementById('creatorDashboardBtn').classList.add('hidden');
+        goToLanding();
+    });
+
+    // Google Login
+    document.getElementById('googleLoginBtn').addEventListener('click', async () => {
+        try {
+            await account.createOAuth2Session('google', 
+                window.location.origin + window.location.pathname, // Success redirect
+                window.location.origin + window.location.pathname  // Failure redirect
+            );
+            currentUser = await account.get();
+            showApp();
+        } catch (err) {
+            alert('Google login failed: ' + err.message);
+        }
+    });
+
+    // Email Login
     document.getElementById('loginBtn').addEventListener('click', async () => {
         const email = document.getElementById('loginEmail').value;
         const password = document.getElementById('loginPassword').value;
+        if (!email || !password) { alert('Email and password required'); return; }
         try {
             await account.createEmailSession(email, password);
-            await loadUser();
+            currentUser = await account.get();
             showApp();
         } catch (err) {
             alert('Login failed: ' + err.message);
@@ -157,165 +250,403 @@
         const email = document.getElementById('regEmail').value;
         const password = document.getElementById('regPassword').value;
         if (password.length < 8) { alert('Password must be at least 8 characters'); return; }
+        if (!email) { alert('Email required'); return; }
         try {
             await account.create(Appwrite.ID.unique(), email, password, name);
             await account.createEmailSession(email, password);
-            await loadUser();
+            currentUser = await account.get();
             showApp();
         } catch (err) {
             alert('Registration failed: ' + err.message);
         }
     });
 
-    // Logout
-    document.getElementById('logoutBtn').addEventListener('click', async () => {
-        await account.deleteSession('current');
-        currentUser = null;
-        document.getElementById('authScreen').classList.remove('hidden');
-        document.getElementById('appScreen').classList.add('hidden');
-    });
-
-    async function loadUser() {
-        currentUser = await account.get();
-    }
+    // Home button
+    document.getElementById('homeBtn').addEventListener('click', goToLanding);
 
     function showApp() {
-        document.getElementById('authScreen').classList.add('hidden');
-        document.getElementById('appScreen').classList.remove('hidden');
+        authScreen.classList.add('hidden');
+        appScreen.classList.remove('hidden');
+        document.getElementById('loggedInUser').textContent = currentUser.name || 'Writer';
+        const isCreator = currentUser && currentUser.$id !== 'guest-' && !currentUser.$id.startsWith('guest-');
+        document.getElementById('creatorDashboardBtn').classList.toggle('hidden', !isCreator);
         goToLanding();
     }
 
-    function showView(viewName) {
-        document.getElementById('landingView').classList.add('hidden');
-        document.getElementById('storyView').classList.add('hidden');
-        document.getElementById('writerDesk').classList.add('hidden');
-        document.getElementById(viewName).classList.remove('hidden');
+    // View navigation
+    function showView(view) {
+        landingView.classList.add('hidden');
+        storyView.classList.add('hidden');
+        writerDesk.classList.add('hidden');
+        creatorDashboard.classList.add('hidden');
+        const viewMap = { landing: landingView, story: storyView, writer: writerDesk, dashboard: creatorDashboard };
+        if (viewMap[view]) viewMap[view].classList.remove('hidden');
     }
 
-    function goToLanding() { showView('landingView'); loadStories(); }
+    function goToLanding() { showView('landing'); loadStories(); loadTotalVisits(); }
     
-    window.goToStory = function(storyId) {
+    window.goToStory = async function(storyId) {
         currentStoryId = storyId;
-        showView('storyView');
+        showView('story');
+        await recordVisit(storyId);
         loadStoryView();
     };
     
-    function goToWriterDesk() { showView('writerDesk'); loadWriterDesk(); }
+    function goToWriterDesk() {
+        showView('writer');
+        loadWriterDesk();
+    }
 
-    // ========== LANDING ==========
-    document.getElementById('createStoryBtn').addEventListener('click', () => {
-        document.getElementById('createStoryForm').classList.remove('hidden');
-    });
-    document.getElementById('cancelCreateBtn').addEventListener('click', () => {
-        document.getElementById('createStoryForm').classList.add('hidden');
-    });
-    document.getElementById('saveNewStoryBtn').addEventListener('click', async () => {
-        const title = document.getElementById('newStoryTitle').value.trim();
-        const genre = document.getElementById('newStoryGenre').value.trim();
-        const desc = document.getElementById('newStoryDesc').value.trim();
-        if (!title) { alert('Title is required'); return; }
+    function goToDashboard() {
+        showView('dashboard');
+        loadCreatorDashboard();
+    }
+
+    // Record page visit
+    async function recordVisit(storyId) {
+        const visitorId = currentUser ? currentUser.$id : 'anonymous-' + Date.now();
+        await databases.createDocument(DATABASE_ID, VISITS_COLLECTION, Appwrite.ID.unique(), {
+            storyId: storyId,
+            visitorId: visitorId,
+            visitedAt: new Date().toISOString()
+        }).catch(() => {}); // Silently fail if error
+    }
+
+    // Load total visits
+    async function loadTotalVisits() {
         try {
-            await databases.createDocument(DATABASE_ID, STORIES_COLLECTION, Appwrite.ID.unique(), {
-                title, genre, description: desc,
-                creatorId: currentUser.$id,
-                creatorName: currentUser.name,
-                editorId: '',
-                status: 'active'
-            });
-            document.getElementById('createStoryForm').classList.add('hidden');
-            document.getElementById('newStoryTitle').value = '';
-            document.getElementById('newStoryGenre').value = '';
-            document.getElementById('newStoryDesc').value = '';
-            loadStories();
+            const res = await databases.listDocuments(DATABASE_ID, VISITS_COLLECTION);
+            const totalVisits = res.total || res.documents.length;
+            document.getElementById('totalVisits').textContent = '📊 ' + totalVisits + ' visits';
         } catch (err) {
-            alert('Could not create story: ' + err.message);
+            document.getElementById('totalVisits').textContent = '📊 0 visits';
         }
-    });
+    }
 
+    // Creator Dashboard button
+    document.getElementById('creatorDashboardBtn').addEventListener('click', goToDashboard);
+    document.getElementById('backToIndexFromDashboardBtn').addEventListener('click', goToLanding);
+
+    // ========== LANDING PAGE (INDEX) ==========
     async function loadStories() {
         const listEl = document.getElementById('storiesList');
         listEl.innerHTML = 'Loading...';
         try {
             const res = await databases.listDocuments(DATABASE_ID, STORIES_COLLECTION);
             if (res.documents.length === 0) {
-                listEl.innerHTML = '<p>No stories yet. Create one!</p>';
+                listEl.innerHTML = '<p style="grid-column:1/-1;">No stories yet. A creator will start one soon!</p>';
                 return;
             }
-            listEl.innerHTML = res.documents.map(story => `
-                <div class="card" onclick="goToStory('${story.$id}')" style="cursor:pointer;">
-                    <h3>${story.title}</h3>
-                    <p>${story.description || ''}</p>
-                    <small>By ${story.creatorName} · ${story.genre || 'No genre'}</small>
-                </div>
-            `).join('');
+            listEl.innerHTML = res.documents.map(story => {
+                const statusClass = story.status === 'completed' ? 'status-completed' : 'status-active';
+                const statusText = story.status === 'completed' ? '✓ Completed' : '✍️ In Progress';
+                const completedDate = story.completedAt ? new Date(story.completedAt).toLocaleDateString() : '';
+                const writers = story.writers ? story.writers.split(',') : [story.creatorName];
+                const displayWriters = writers.slice(0, 2).join(', ');
+                const moreWriters = writers.length > 2 ? ` +${writers.length - 2} more` : '';
+                
+                return `
+                    <div class="card" onclick="goToStory('${story.$id}')" style="cursor:pointer;" 
+                         oncontextmenu="event.preventDefault(); showStoryPopup('${story.$id}'); return false;"
+                         ontouchstart="startLongPress(event, '${story.$id}')"
+                         ontouchend="cancelLongPress()">
+                        <h3>${story.title}</h3>
+                        <p style="font-size:0.85rem; color:#7f8c8d;">${story.description || ''}</p>
+                        <div style="margin-top:0.5rem;">
+                            <span class="badge ${statusClass}">${statusText}</span>
+                            ${completedDate ? `<span class="badge">📅 ${completedDate}</span>` : ''}
+                        </div>
+                        <div style="margin-top:0.3rem; font-size:0.8rem; color:#555;">
+                            👥 ${displayWriters}${moreWriters}
+                        </div>
+                    </div>
+                `;
+            }).join('');
         } catch (err) {
-            listEl.innerHTML = 'Error loading stories: ' + err.message;
+            listEl.innerHTML = 'Error loading stories.';
         }
     }
 
+    // Long press for mobile
+    let longPressTimer;
+    window.startLongPress = function(event, storyId) {
+        longPressTimer = setTimeout(() => showStoryPopup(storyId), 800);
+    };
+    window.cancelLongPress = function() {
+        clearTimeout(longPressTimer);
+    };
+
+    // Popup for full writer list
+    window.showStoryPopup = async function(storyId) {
+        try {
+            const story = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, storyId);
+            const writers = story.writers ? story.writers.split(',') : [story.creatorName];
+            document.getElementById('popupContent').innerHTML = `
+                <h3>${story.title}</h3>
+                <p><strong>Status:</strong> ${story.status}</p>
+                <p><strong>Genre:</strong> ${story.genre || 'Not specified'}</p>
+                <p><strong>Writers:</strong></p>
+                <ul>${writers.map(w => '<li>' + w.trim() + '</li>').join('')}</ul>
+                ${story.completedAt ? '<p><strong>Completed:</strong> ' + new Date(story.completedAt).toLocaleDateString() + '</p>' : ''}
+                <button onclick="closePopup()" style="margin-top:1rem;">Close</button>
+            `;
+            document.getElementById('popupOverlay').classList.remove('hidden');
+            document.getElementById('popupContent').classList.remove('hidden');
+        } catch (err) {
+            alert('Error loading story details');
+        }
+    };
+    window.closePopup = function() {
+        document.getElementById('popupOverlay').classList.add('hidden');
+        document.getElementById('popupContent').classList.add('hidden');
+    };
+    document.getElementById('popupOverlay').addEventListener('click', window.closePopup);
+
     // ========== STORY VIEW ==========
-    document.getElementById('backToLandingBtn').addEventListener('click', goToLanding);
-    document.getElementById('contributeBtn').addEventListener('click', goToWriterDesk);
+    document.getElementById('backToIndexBtn').addEventListener('click', goToLanding);
 
     async function loadStoryView() {
         document.getElementById('chaptersContainer').innerHTML = 'Loading...';
+        
         try {
             currentStory = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId);
-            document.getElementById('storyTitle').textContent = currentStory.title;
-            document.getElementById('storyGenre').textContent = currentStory.genre ? 'Genre: ' + currentStory.genre : '';
+            
+            const isCreator = currentUser && currentUser.$id === currentStory.creatorId;
+            const canWrite = currentUser && currentUser.$id === currentStory.currentWriterId;
+            
+            // Load likes
+            let likeCount = 0;
+            let userLiked = false;
+            try {
+                const likesRes = await databases.listDocuments(DATABASE_ID, LIKES_COLLECTION, [
+                    Appwrite.Query.equal('storyId', currentStoryId)
+                ]);
+                likeCount = likesRes.total || likesRes.documents.length;
+                if (currentUser) {
+                    userLiked = likesRes.documents.some(l => l.userId === currentUser.$id);
+                }
+            } catch (e) { /* ignore */ }
+
+            // Story header
+            document.getElementById('storyHeader').innerHTML = `
+                <div class="flex-between">
+                    <div>
+                        <h2>${currentStory.title}</h2>
+                        <p style="color:#7f8c8d;">${currentStory.genre ? 'Genre: ' + currentStory.genre : ''}</p>
+                        <p>Created by: <span class="badge">${currentStory.creatorName}</span></p>
+                        <p style="font-size:0.8rem;">Status: <span class="badge ${currentStory.status === 'completed' ? 'status-completed' : 'status-active'}">${currentStory.status}</span></p>
+                    </div>
+                    <div style="text-align:right;">
+                        <button class="heart-btn ${userLiked ? 'liked' : ''}" onclick="toggleLike('${currentStoryId}')">
+                            ${userLiked ? '❤️' : '🤍'} <span id="likeCount">${likeCount}</span>
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            // Show contribute button only if it's this user's turn
+            const contributeBtn = document.getElementById('contributeBtn');
+            const waitingBtn = document.getElementById('waitingBtn');
+            const inviteSection = document.getElementById('inviteSection');
+            
+            if (canWrite && currentUser && !currentUser.$id.startsWith('guest-')) {
+                contributeBtn.classList.remove('hidden');
+                contributeBtn.onclick = goToWriterDesk;
+                waitingBtn.classList.add('hidden');
+            } else if (currentUser && !currentUser.$id.startsWith('guest-')) {
+                contributeBtn.classList.add('hidden');
+                waitingBtn.classList.remove('hidden');
+            } else {
+                contributeBtn.classList.add('hidden');
+                waitingBtn.classList.add('hidden');
+            }
+            
+            // Show invite section only to creator
+            if (isCreator) {
+                inviteSection.classList.remove('hidden');
+                loadInvites();
+            } else {
+                inviteSection.classList.add('hidden');
+            }
+            
+            // Load sessions (chapters)
             const chaptersRes = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, [
                 Appwrite.Query.equal('storyId', currentStoryId),
                 Appwrite.Query.orderAsc('chapterNumber')
             ]);
+            
             const chapters = chaptersRes.documents;
             if (chapters.length === 0) {
-                document.getElementById('chaptersContainer').innerHTML = '<p>No chapters yet. Be the first to contribute!</p>';
-                return;
+                document.getElementById('chaptersContainer').innerHTML = '<p>No sessions yet. Be the first to contribute!</p>';
+            } else {
+                document.getElementById('chaptersContainer').innerHTML = chapters.map(ch => `
+                    <div class="card">
+                        <h4>Session ${ch.chapterNumber} — by <span class="badge writer">${ch.authorName}</span></h4>
+                        <p style="white-space:pre-wrap">${ch.content}</p>
+                        <div class="flex-between" style="margin-top:0.5rem;">
+                            <small>${new Date(ch.$createdAt).toLocaleString()}</small>
+                        </div>
+                    </div>
+                `).join('');
             }
-            document.getElementById('chaptersContainer').innerHTML = chapters.map(ch => `
-                <div class="card">
-                    <h4>Chapter ${ch.chapterNumber} — by ${ch.authorName}</h4>
-                    <p style="white-space:pre-wrap">${ch.content}</p>
-                    <small>${new Date(ch.$createdAt).toLocaleString()}</small>
-                </div>
-            `).join('');
         } catch (err) {
-            document.getElementById('chaptersContainer').innerHTML = 'Error loading story: ' + err.message;
+            document.getElementById('chaptersContainer').innerHTML = 'Error loading story.';
         }
     }
 
-    // ========== WRITER'S DESK ==========
-    document.getElementById('backToStoryBtn').addEventListener('click', () => goToStory(currentStoryId));
+    // Toggle like
+    window.toggleLike = async function(storyId) {
+        if (!currentUser || currentUser.$id.startsWith('guest-')) {
+            alert('Please login to like stories.');
+            return;
+        }
+        try {
+            const existing = await databases.listDocuments(DATABASE_ID, LIKES_COLLECTION, [
+                Appwrite.Query.equal('storyId', storyId),
+                Appwrite.Query.equal('userId', currentUser.$id)
+            ]);
+            if (existing.documents.length > 0) {
+                await databases.deleteDocument(DATABASE_ID, LIKES_COLLECTION, existing.documents[0].$id);
+            } else {
+                await databases.createDocument(DATABASE_ID, LIKES_COLLECTION, Appwrite.ID.unique(), {
+                    storyId: storyId,
+                    userId: currentUser.$id
+                });
+            }
+            loadStoryView(); // Refresh to update count
+        } catch (err) {
+            console.error('Like error:', err);
+        }
+    };
 
-    document.getElementById('chapterText').addEventListener('input', () => {
-        const text = document.getElementById('chapterText').value;
-        const words = text.trim().split(/\s+/).filter(w => w.length > 0);
-        const count = words.length;
-        document.getElementById('wordCountDisplay').textContent = count;
-        const pct = Math.min((count / 300) * 100, 100);
-        document.getElementById('wordProgress').style.width = pct + '%';
-        if (count > 300) {
-            document.getElementById('wordProgress').classList.add('over-limit');
-            document.getElementById('wordWarning').classList.remove('hidden');
-        } else {
-            document.getElementById('wordProgress').classList.remove('over-limit');
-            document.getElementById('wordWarning').classList.add('hidden');
+    // ========== INVITE SYSTEM ==========
+    document.getElementById('sendInviteBtn').addEventListener('click', async () => {
+        const identifier = document.getElementById('inviteIdentifier').value.trim();
+        if (!identifier) { alert('Enter a writer name or identifier'); return; }
+        
+        try {
+            await databases.createDocument(DATABASE_ID, INVITATIONS_COLLECTION, Appwrite.ID.unique(), {
+                storyId: currentStoryId,
+                email: identifier, // Can be any identifier, not just email
+                status: 'pending',
+                turnOrder: 1,
+                invitedBy: currentUser.$id
+            });
+            document.getElementById('inviteIdentifier').value = '';
+            loadInvites();
+            alert('Writer invited! Share the story password with them.');
+        } catch (err) {
+            alert('Error sending invite: ' + err.message);
         }
     });
 
+    document.getElementById('setPasswordBtn').addEventListener('click', async () => {
+        const password = document.getElementById('accessPassword').value.trim();
+        if (!password) { alert('Enter a password'); return; }
+        try {
+            await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId, {
+                accessPassword: password
+            });
+            alert('Access password set! Share this with invited writers.');
+        } catch (err) {
+            alert('Error setting password: ' + err.message);
+        }
+    });
+
+    async function loadInvites() {
+        const inviteList = document.getElementById('inviteList');
+        try {
+            const res = await databases.listDocuments(DATABASE_ID, INVITATIONS_COLLECTION, [
+                Appwrite.Query.equal('storyId', currentStoryId)
+            ]);
+            if (res.documents.length === 0) {
+                inviteList.innerHTML = '<p>No invitations yet.</p>';
+                return;
+            }
+            inviteList.innerHTML = '<h4>Invited Writers:</h4>' + res.documents.map(inv => `
+                <div class="card" style="padding:0.8rem;">
+                    <div class="flex-between">
+                        <div>
+                            <p>👤 ${inv.email}</p>
+                            <span class="badge">${inv.status}</span>
+                        </div>
+                        <button onclick="assignTurn('${inv.$id}', '${inv.email}')" class="success">🎯 Give Turn</button>
+                    </div>
+                </div>
+            `).join('');
+        } catch (err) {
+            inviteList.innerHTML = 'Error loading invitations.';
+        }
+    }
+
+    window.assignTurn = async function(inviteId, identifier) {
+        try {
+            await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId, {
+                currentWriterId: inviteId
+            });
+            await databases.updateDocument(DATABASE_ID, INVITATIONS_COLLECTION, inviteId, {
+                status: 'accepted'
+            });
+            
+            // Add to writers list
+            const writers = (currentStory.writers || currentStory.creatorName) + ',' + identifier;
+            await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId, {
+                writers: writers
+            });
+            
+            alert(`Writing turn assigned to ${identifier}!`);
+            currentStory = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId);
+            loadStoryView();
+            loadInvites();
+        } catch (err) {
+            alert('Error assigning turn: ' + err.message);
+        }
+    };
+
+    // ========== WRITER'S DESK ==========
+    document.getElementById('backToStoryBtn').addEventListener('click', () => {
+        if (currentStoryId) window.goToStory(currentStoryId);
+    });
+
+    // New Story from Writer's Desk (only for creator)
+    document.getElementById('newStoryFromDeskBtn').addEventListener('click', () => {
+        document.getElementById('createStoryForm').classList.toggle('hidden');
+    });
+
+    const chapterText = document.getElementById('chapterText');
+    const wordCountDisplay = document.getElementById('wordCountDisplay');
+    const wordProgress = document.getElementById('wordProgress');
+    const wordWarning = document.getElementById('wordWarning');
+    const draftStatus = document.getElementById('draftStatus');
+
+    // Word counter
+    chapterText.addEventListener('input', () => {
+        const text = chapterText.value;
+        const words = text.trim().split(/\s+/).filter(w => w.length > 0);
+        const count = words.length;
+        wordCountDisplay.textContent = count;
+        const pct = Math.min((count / 300) * 100, 100);
+        wordProgress.style.width = pct + '%';
+        wordProgress.classList.toggle('over-limit', count > 300);
+        wordWarning.classList.toggle('hidden', count <= 300);
+    });
+
+    // Save draft
     document.getElementById('saveDraftBtn').addEventListener('click', saveDraft);
+    
     async function saveDraft() {
-        const content = document.getElementById('chapterText').value;
-        document.getElementById('draftStatus').textContent = 'Saving...';
+        const content = chapterText.value;
+        draftStatus.textContent = 'Saving...';
         try {
             const existing = await databases.listDocuments(DATABASE_ID, DRAFTS_COLLECTION, [
                 Appwrite.Query.equal('storyId', currentStoryId),
                 Appwrite.Query.equal('authorId', currentUser.$id)
             ]);
+            const wordCount = content.trim().split(/\s+/).filter(w => w.length > 0).length;
             if (existing.documents.length > 0) {
                 await databases.updateDocument(DATABASE_ID, DRAFTS_COLLECTION, existing.documents[0].$id, {
                     content,
-                    wordCount: content.trim().split(/\s+/).filter(w => w.length > 0).length,
+                    wordCount: wordCount,
                     lastModified: new Date().toISOString()
                 });
             } else {
@@ -323,26 +654,35 @@
                     storyId: currentStoryId,
                     authorId: currentUser.$id,
                     content,
-                    wordCount: content.trim().split(/\s+/).filter(w => w.length > 0).length,
+                    wordCount: wordCount,
                     lastModified: new Date().toISOString()
                 });
             }
-            document.getElementById('draftStatus').textContent = 'Draft saved at ' + new Date().toLocaleTimeString();
+            draftStatus.textContent = 'Draft saved at ' + new Date().toLocaleTimeString();
         } catch (err) {
-            document.getElementById('draftStatus').textContent = 'Error saving draft: ' + err.message;
+            draftStatus.textContent = 'Error saving draft.';
         }
     }
 
+    // Submit Session
     document.getElementById('submitChapterBtn').addEventListener('click', async () => {
-        const content = document.getElementById('chapterText').value.trim();
+        if (!currentStoryId) { alert('No story selected.'); return; }
+        if (!currentStory || currentUser.$id !== currentStory.currentWriterId) {
+            alert("It's not your turn to write!");
+            return;
+        }
+        
+        const content = chapterText.value.trim();
         if (!content) { alert('Write something first.'); return; }
         const wordCount = content.split(/\s+/).filter(w => w.length > 0).length;
         if (wordCount > 300) { alert('Please shorten to 300 words or less.'); return; }
+        
         try {
             const chaptersRes = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, [
                 Appwrite.Query.equal('storyId', currentStoryId)
             ]);
             const nextNumber = chaptersRes.documents.length + 1;
+            
             await databases.createDocument(DATABASE_ID, CHAPTERS_COLLECTION, Appwrite.ID.unique(), {
                 storyId: currentStoryId,
                 chapterNumber: nextNumber,
@@ -352,10 +692,20 @@
                 wordCount,
                 status: 'published'
             });
-            document.getElementById('chapterText').value = '';
-            document.getElementById('wordCountDisplay').textContent = '0';
-            document.getElementById('wordProgress').style.width = '0%';
-            document.getElementById('draftStatus').textContent = 'Chapter submitted!';
+            
+            // Clear turn
+            await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId, {
+                currentWriterId: ''
+            });
+            
+            chapterText.value = '';
+            wordCountDisplay.textContent = '0';
+            wordProgress.style.width = '0%';
+            wordProgress.classList.remove('over-limit');
+            wordWarning.classList.add('hidden');
+            draftStatus.textContent = 'Session submitted! ✅';
+            
+            // Delete draft
             const draftDocs = await databases.listDocuments(DATABASE_ID, DRAFTS_COLLECTION, [
                 Appwrite.Query.equal('storyId', currentStoryId),
                 Appwrite.Query.equal('authorId', currentUser.$id)
@@ -363,51 +713,157 @@
             if (draftDocs.documents.length > 0) {
                 await databases.deleteDocument(DATABASE_ID, DRAFTS_COLLECTION, draftDocs.documents[0].$id);
             }
+            
+            currentStory = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId);
             loadStoryView();
-            loadPreviousChapters();
+            loadWriterDesk();
         } catch (err) {
-            alert('Error submitting chapter: ' + err.message);
+            alert('Error submitting session: ' + err.message);
         }
     });
 
     async function loadWriterDesk() {
+        if (!currentStory) {
+            currentStory = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId);
+        }
+        
+        // Check access: must have turn or know password
+        const isCreator = currentUser.$id === currentStory.creatorId;
+        const hasTurn = currentUser.$id === currentStory.currentWriterId;
+        
+        if (!hasTurn && !isCreator) {
+            const password = prompt("Enter the story access password (ask the creator):");
+            if (password !== currentStory.accessPassword) {
+                alert("Incorrect password or you don't have a turn yet.");
+                window.goToStory(currentStoryId);
+                return;
+            }
+        }
+        
         document.getElementById('deskStoryTitle').textContent = currentStory.title;
+        
+        // Show new story button only for creator
+        document.getElementById('newStoryFromDeskBtn').classList.toggle('hidden', !isCreator);
+        
+        // Load draft
         try {
             const drafts = await databases.listDocuments(DATABASE_ID, DRAFTS_COLLECTION, [
                 Appwrite.Query.equal('storyId', currentStoryId),
                 Appwrite.Query.equal('authorId', currentUser.$id)
             ]);
             if (drafts.documents.length > 0) {
-                document.getElementById('chapterText').value = drafts.documents[0].content;
-                document.getElementById('chapterText').dispatchEvent(new Event('input'));
-                document.getElementById('draftStatus').textContent = 'Loaded draft from ' + new Date(drafts.documents[0].lastModified).toLocaleString();
+                chapterText.value = drafts.documents[0].content;
+                chapterText.dispatchEvent(new Event('input'));
+                draftStatus.textContent = 'Loaded draft from ' + new Date(drafts.documents[0].lastModified).toLocaleString();
             } else {
-                document.getElementById('chapterText').value = '';
-                document.getElementById('draftStatus').textContent = '';
+                chapterText.value = '';
+                draftStatus.textContent = '';
             }
         } catch (err) { /* ignore */ }
-        loadPreviousChapters();
+        
+        loadPreviousSessions();
     }
 
-    async function loadPreviousChapters() {
+    async function loadPreviousSessions() {
         const prevList = document.getElementById('prevChaptersList');
+        const lastSessionCard = document.getElementById('lastSessionCard');
         prevList.innerHTML = 'Loading...';
+        lastSessionCard.classList.add('hidden');
+        
         try {
             const res = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, [
                 Appwrite.Query.equal('storyId', currentStoryId),
-                Appwrite.Query.orderAsc('chapterNumber')
+                Appwrite.Query.orderDesc('chapterNumber'),
+                Appwrite.Query.limit(5)
             ]);
-            prevList.innerHTML = res.documents.map(ch => `
-                <div class="card">
-                    <strong>Ch.${ch.chapterNumber}</strong> — ${ch.authorName}: ${ch.content.substring(0, 100)}...
-                </div>
-            `).join('');
+            
+            const chapters = res.documents;
+            if (chapters.length === 0) {
+                prevList.innerHTML = '<p>No sessions yet.</p>';
+                return;
+            }
+            
+            // Show last session in full
+            const last = chapters[0];
+            lastSessionCard.classList.remove('hidden');
+            lastSessionCard.innerHTML = `
+                <h4>Last Session (Session ${last.chapterNumber}) — by ${last.authorName}</h4>
+                <p style="white-space:pre-wrap; margin-top:0.5rem;">${last.content}</p>
+                <small>${new Date(last.$createdAt).toLocaleString()}</small>
+            `;
+            
+            // Show older sessions as summaries
+            if (chapters.length > 1) {
+                prevList.innerHTML = '<h4>Earlier Sessions:</h4>' + chapters.slice(1).map(ch => `
+                    <div class="card" style="padding:0.8rem; font-size:0.85rem;">
+                        <strong>Session ${ch.chapterNumber}</strong> — ${ch.authorName}: ${ch.content.substring(0, 80)}...
+                    </div>
+                `).join('');
+            } else {
+                prevList.innerHTML = '';
+            }
         } catch (err) {
-            prevList.innerHTML = 'Could not load previous chapters.';
+            prevList.innerHTML = 'Could not load previous sessions.';
         }
     }
 
-    // Check for existing session on load
+    // ========== CREATOR DASHBOARD ==========
+    async function loadCreatorDashboard() {
+        const listEl = document.getElementById('creatorStoriesList');
+        if (!currentUser || currentUser.$id.startsWith('guest-')) {
+            listEl.innerHTML = '<p>Please login as a creator.</p>';
+            return;
+        }
+        listEl.innerHTML = 'Loading...';
+        try {
+            const res = await databases.listDocuments(DATABASE_ID, STORIES_COLLECTION, [
+                Appwrite.Query.equal('creatorId', currentUser.$id)
+            ]);
+            if (res.documents.length === 0) {
+                listEl.innerHTML = '<p>You haven\'t created any stories yet.</p>';
+                return;
+            }
+            listEl.innerHTML = res.documents.map(story => `
+                <div class="card">
+                    <h3>${story.title}</h3>
+                    <p>Status: <span class="badge ${story.status === 'completed' ? 'status-completed' : 'status-active'}">${story.status}</span></p>
+                    <p>Writers: ${story.writers || story.creatorName}</p>
+                    <div class="flex-row" style="margin-top:0.5rem;">
+                        <button onclick="goToStory('${story.$id}')">📖 View</button>
+                        <button onclick="goToWriterDeskFromDashboard('${story.$id}')">✍️ Write</button>
+                        <button onclick="completeStory('${story.$id}')" class="${story.status === 'completed' ? '' : 'danger'}" ${story.status === 'completed' ? 'disabled' : ''}>
+                            ${story.status === 'completed' ? '✓ Completed' : '🏁 End Story'}
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        } catch (err) {
+            listEl.innerHTML = 'Error loading your stories.';
+        }
+    }
+
+    window.goToWriterDeskFromDashboard = function(storyId) {
+
+        currentStoryId = storyId;        goToWriterDesk();
+    };
+
+    window.completeStory = async function(storyId) {
+        if (!confirm('End this story? It will be marked as completed.')) return;
+        try {
+            await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, storyId, {
+                status: 'completed',
+                completedAt: new Date().toISOString(),
+                currentWriterId: ''
+            });
+            alert('Story marked as completed! 🎉');
+            loadCreatorDashboard();
+            loadStories();
+        } catch (err) {
+            alert('Error: ' + err.message);
+        }
+    };
+
+    // ========== INITIALIZATION ==========
     (async () => {
         try {
             const user = await account.get();
@@ -416,7 +872,7 @@
                 showApp();
             }
         } catch (e) {
-            // not logged in, do nothing
+            // not logged in
         }
     })();
 </script>
