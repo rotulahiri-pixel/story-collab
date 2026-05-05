@@ -11,12 +11,13 @@
         .container { max-width: 900px; margin: 0 auto; }
         .hidden { display: none !important; }
         h1, h2, h3 { margin: 0.8rem 0; }
-        button { padding: 0.5rem 1rem; border: none; border-radius: 8px; background: #5b6fe6; color: white; font-weight: 600; cursor: pointer; margin: 0.3rem; font-size: 0.9rem; }
+        button { padding: 0.45rem 0.9rem; border: none; border-radius: 8px; background: #5b6fe6; color: white; font-weight: 600; cursor: pointer; margin: 0.25rem; font-size: 0.85rem; }
         button:disabled { background: #aaa; cursor: not-allowed; }
         button.danger { background: #e74c3c; }
         button.success { background: #27ae60; }
         button.outline { background: transparent; border: 2px solid #5b6fe6; color: #5b6fe6; }
-        button.small { padding: 0.3rem 0.7rem; font-size: 0.8rem; }
+        button.small { padding: 0.3rem 0.6rem; font-size: 0.8rem; }
+        button.warn { background: #f39c12; }
         .form-group { margin-bottom: 1rem; }
         input, textarea { width: 100%; padding: 0.6rem; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; }
         textarea { resize: vertical; }
@@ -34,23 +35,23 @@
         .badge.status-active { background: #d5f5e3; color: #27ae60; }
         .badge.status-completed { background: #d6eaf8; color: #2980b9; }
         .badge.writer { background: #e8daef; color: #8e44ad; }
-        .badge.admin { background: #fadbd8; color: #e74c3c; }
+        .badge.admin { background: #f9e79f; color: #7d6608; }
         .flex-row { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
         .flex-between { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
         .heart-btn { background: none; border: none; font-size: 1.1rem; cursor: pointer; padding: 0.2rem 0.5rem; }
         .heart-btn.liked { color: #e74c3c; }
-        .comment-btn { background: none; border: none; font-size: 1rem; cursor: pointer; padding: 0.2rem 0.5rem; color: #7f8c8d; }
-        .comment-section { margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid #eee; }
-        .comment-item { font-size: 0.8rem; padding: 0.3rem 0; color: #555; }
+        .comment-btn { background: none; border: none; font-size: 0.9rem; cursor: pointer; padding: 0.2rem 0.5rem; color: #7f8c8d; }
+        .comment-btn:hover { color: #5b6fe6; }
         .popup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); z-index: 1000; max-width: 90%; max-height: 80vh; overflow-y: auto; }
         .overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 999; }
         .tagline { color: #7f8c8d; font-style: italic; margin-bottom: 1.5rem; }
         .header-section { text-align: center; padding: 2rem 0; }
         .invite-section { border: 2px dashed #ddd; padding: 1rem; border-radius: 8px; margin: 1rem 0; }
-        .nav-bar { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #eee; }
+        .nav-bar { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #eee; }
         .nav-bar button { background: transparent; color: #5b6fe6; border: 1px solid #5b6fe6; }
         .nav-bar button.active { background: #5b6fe6; color: white; }
-        .editing-indicator { background: #fef9e7; border: 1px solid #f39c12; padding: 0.5rem; border-radius: 8px; margin: 0.5rem 0; font-size: 0.85rem; }
+        .comment-form { display: flex; gap: 0.3rem; margin-top: 0.3rem; }
+        .comment-form input { flex: 1; padding: 0.3rem 0.5rem; font-size: 0.8rem; }
         @media (min-width: 768px) { .card-grid { grid-template-columns: repeat(2, 1fr); } }
     </style>
 </head>
@@ -90,7 +91,6 @@
             </div>
             <div class="flex-row">
                 <span id="loggedInUser" class="badge"></span>
-                <span id="adminBadge" class="badge admin hidden">Admin</span>
                 <button id="logoutBtn" class="danger small">🚪 Logout</button>
             </div>
         </div>
@@ -99,6 +99,7 @@
         <div id="navBar" class="nav-bar">
             <button id="navHome" class="active">🏠 Home</button>
             <button id="navDashboard" class="hidden">⚙️ Dashboard</button>
+            <button id="navAdmin" class="hidden">🔧 Admin</button>
         </div>
 
         <!-- Landing View (Index) -->
@@ -116,11 +117,12 @@
             <div id="storyHeader" class="card"></div>
             <div id="chaptersContainer"></div>
             <div id="storyActions" style="margin:1rem 0;"></div>
-            <div id="editSection" class="hidden"></div>
+            <button id="contributeBtn" class="success hidden">✍️ Contribute (It's Your Turn!)</button>
+            <div id="waitingSection" class="hidden" style="margin:1rem 0;"></div>
             
             <div id="inviteSection" class="invite-section hidden">
                 <h3>Invite Writers</h3>
-                <p style="font-size:0.8rem; color:#7f8c8d;">Enter the writer's registered email or username:</p>
+                <p style="font-size:0.8rem; color:#7f8c8d;">Enter writer's registered email or username:</p>
                 <div class="flex-row">
                     <input type="text" id="inviteIdentifier" placeholder="Writer's email or username" style="flex:1;">
                     <button id="sendInviteBtn">📨 Invite</button>
@@ -131,6 +133,16 @@
                     <button id="setPasswordBtn">🔒 Set Password</button>
                 </div>
                 <div id="inviteList" style="margin-top:1rem;"></div>
+            </div>
+
+            <!-- Comments Section -->
+            <div id="commentsSection" style="margin-top:1.5rem;">
+                <h4>💬 Comments</h4>
+                <div id="commentsList"></div>
+                <div id="commentForm" class="comment-form hidden">
+                    <input type="text" id="commentInput" placeholder="Add a comment (max 15 words)" maxlength="100">
+                    <button id="postCommentBtn" class="small">Post</button>
+                </div>
             </div>
         </div>
 
@@ -158,17 +170,22 @@
             </div>
         </div>
 
-        <!-- Creator/Admin Dashboard -->
+        <!-- Creator Dashboard -->
         <div id="creatorDashboard" class="hidden">
-            <h2>⚙️ Dashboard</h2>
-            <div id="adminTools" class="card hidden" style="border-left:4px solid #e74c3c; grid-column:1/-1;">
-                <h3>🛡️ Admin Tools</h3>
-                <p style="font-size:0.85rem;">Assign Editor: <input type="email" id="editorEmail" placeholder="Editor's email" style="width:auto; display:inline;">
-                <button id="assignEditorBtn" class="small">Assign</button></p>
-                <p style="font-size:0.8rem; color:#7f8c8d;">Max Creators: <span id="maxCreatorsDisplay">10</span></p>
-            </div>
+            <h2>⚙️ Creator Dashboard</h2>
+            <p style="font-size:0.8rem; color:#7f8c8d;">Manage your stories as a Creator</p>
             <div id="creatorStoriesList" class="card-grid"></div>
         </div>
+
+        <!-- Admin Panel -->
+        <div id="adminPanel" class="hidden">
+            <h2>🔧 Admin Panel</h2>
+            <div id="adminContent" class="card"></div>
+        </div>
+
+        <!-- Edit Story Popup -->
+        <div id="editOverlay" class="overlay hidden"></div>
+        <div id="editPopup" class="popup hidden"></div>
 
         <!-- Popup -->
         <div id="popupOverlay" class="overlay hidden"></div>
@@ -188,10 +205,8 @@
     const LIKES_COLLECTION = 'storyLikes';
     const VISITS_COLLECTION = 'pageVisits';
     const COMMENTS_COLLECTION = 'comments';
-    const SETTINGS_COLLECTION = 'appSettings';
-    // ==========================
-
-    const SUPER_ADMIN = 'rotulahiri@gmail.com';
+    const CONFIG_COLLECTION = 'appConfig';
+    // =================================================
 
     const client = new Appwrite.Client();
     client.setEndpoint(APPWRITE_ENDPOINT).setProject(PROJECT_ID);
@@ -201,9 +216,10 @@
     let currentUser = null;
     let currentStoryId = null;
     let currentStory = null;
-    let isSuperAdmin = false;
+    let appConfig = { approvedCreators: [], maxCreators: 10, masterAdmin: 'rotulahiri@gmail.com' };
+    let isMasterAdmin = false;
+    let isApprovedCreator = false;
     let isEditor = false;
-    let maxCreators = 10;
 
     // Auth toggle
     document.getElementById('showRegister').addEventListener('click', (e) => {
@@ -217,15 +233,48 @@
         document.getElementById('loginForm').classList.remove('hidden');
     });
 
-    // Library
-    document.getElementById('libraryBtn').addEventListener('click', () => {
+    // Load app config
+    async function loadAppConfig() {
+        try {
+            const res = await databases.listDocuments(DATABASE_ID, CONFIG_COLLECTION);
+            res.documents.forEach(doc => {
+                if (doc.key === 'approvedCreators') {
+                    appConfig.approvedCreators = doc.value.split(',').map(e => e.trim());
+                }
+                if (doc.key === 'maxCreators') {
+                    appConfig.maxCreators = parseInt(doc.value) || 10;
+                }
+                if (doc.key === 'masterAdmin') {
+                    appConfig.masterAdmin = doc.value;
+                }
+            });
+        } catch (e) { /* use defaults */ }
+    }
+
+    // Check user roles
+    function checkUserRoles() {
+        if (!currentUser || currentUser.isGuest) {
+            isMasterAdmin = false;
+            isApprovedCreator = false;
+            isEditor = false;
+            return;
+        }
+        const email = currentUser.email || '';
+        isMasterAdmin = (email === appConfig.masterAdmin);
+        isApprovedCreator = appConfig.approvedCreators.includes(email) || isMasterAdmin;
+        isEditor = isMasterAdmin; // Editor gets same privileges as master admin
+    }
+
+    // Library (guest access)
+    document.getElementById('libraryBtn').addEventListener('click', async () => {
+        await loadAppConfig();
         currentUser = { $id: 'guest-' + Date.now(), name: 'Reader', isGuest: true };
-        isSuperAdmin = false; isEditor = false;
+        checkUserRoles();
         authScreen.classList.add('hidden');
         appScreen.classList.remove('hidden');
         document.getElementById('loggedInUser').textContent = '📖 Reader (Guest)';
-        document.getElementById('adminBadge').classList.add('hidden');
         document.getElementById('navDashboard').classList.add('hidden');
+        document.getElementById('navAdmin').classList.add('hidden');
         goToLanding();
     });
 
@@ -235,9 +284,12 @@
             await account.createOAuth2Session('google', window.location.href, window.location.href);
             currentUser = await account.get();
             currentUser.isGuest = false;
-            await checkPrivileges();
+            await loadAppConfig();
+            checkUserRoles();
             showApp();
-        } catch (err) { alert('Google login failed: ' + err.message); }
+        } catch (err) {
+            alert('Google login failed: ' + err.message);
+        }
     });
 
     // Email Login
@@ -249,9 +301,12 @@
             await account.createEmailSession(email, password);
             currentUser = await account.get();
             currentUser.isGuest = false;
-            await checkPrivileges();
+            await loadAppConfig();
+            checkUserRoles();
             showApp();
-        } catch (err) { alert('Login failed: ' + err.message); }
+        } catch (err) {
+            alert('Login failed: ' + err.message);
+        }
     });
 
     // Register
@@ -261,98 +316,54 @@
         const password = document.getElementById('regPassword').value;
         if (password.length < 8) { alert('Password must be at least 8 characters'); return; }
         if (!email) { alert('Email required'); return; }
-        
-        // Check creator limit
-        const existingCreators = await databases.listDocuments(DATABASE_ID, STORIES_COLLECTION);
-        const uniqueCreators = new Set(existingCreators.documents.map(s => s.creatorId));
-        if (uniqueCreators.size >= maxCreators) {
-            alert('Maximum number of creators reached (' + maxCreators + '). Please contact the admin.');
-            return;
-        }
-        
         try {
             await account.create(Appwrite.ID.unique(), email, password, name);
             await account.createEmailSession(email, password);
             currentUser = await account.get();
             currentUser.isGuest = false;
-            await checkPrivileges();
+            await loadAppConfig();
+            checkUserRoles();
             showApp();
-        } catch (err) { alert('Registration failed: ' + err.message); }
+        } catch (err) {
+            alert('Registration failed: ' + err.message);
+        }
     });
 
     // Logout
     document.getElementById('logoutBtn').addEventListener('click', async () => {
-        try { await account.deleteSession('current'); } catch (e) {}
+        try { await account.deleteSession('current'); } catch (e) { /* ignore */ }
         currentUser = null; currentStoryId = null; currentStory = null;
-        isSuperAdmin = false; isEditor = false;
         appScreen.classList.add('hidden');
         authScreen.classList.remove('hidden');
-        document.getElementById('loginEmail').value = '';
-        document.getElementById('loginPassword').value = '';
     });
 
     // Navigation
     document.getElementById('navHome').addEventListener('click', goToLanding);
     document.getElementById('navDashboard').addEventListener('click', goToDashboard);
-
-    // Admin tools
-    document.getElementById('assignEditorBtn').addEventListener('click', async () => {
-        const email = document.getElementById('editorEmail').value.trim();
-        if (!email) { alert('Enter an email'); return; }
-        try {
-            await databases.createDocument(DATABASE_ID, SETTINGS_COLLECTION, Appwrite.ID.unique(), {
-                key: 'editor',
-                value: email
-            });
-            alert('Editor assigned: ' + email);
-        } catch (err) { alert('Error: ' + err.message); }
-    });
-
-    async function checkPrivileges() {
-        isSuperAdmin = (currentUser.email === SUPER_ADMIN);
-        // Check if user is editor
-        try {
-            const res = await databases.listDocuments(DATABASE_ID, SETTINGS_COLLECTION, [
-                Appwrite.Query.equal('key', 'editor')
-            ]);
-            isEditor = res.documents.some(d => d.value === currentUser.email);
-        } catch (e) { isEditor = false; }
-        // Load max creators
-        try {
-            const res = await databases.listDocuments(DATABASE_ID, SETTINGS_COLLECTION, [
-                Appwrite.Query.equal('key', 'maxCreators')
-            ]);
-            if (res.documents.length > 0) maxCreators = parseInt(res.documents[0].value) || 10;
-        } catch (e) { maxCreators = 10; }
-    }
+    document.getElementById('navAdmin').addEventListener('click', goToAdminPanel);
 
     function showApp() {
         authScreen.classList.add('hidden');
         appScreen.classList.remove('hidden');
         document.getElementById('loggedInUser').textContent = currentUser.name || 'Writer';
-        document.getElementById('adminBadge').classList.toggle('hidden', !(isSuperAdmin || isEditor));
-        document.getElementById('navDashboard').classList.remove('hidden');
-        // Show admin tools only for super admin
-        document.getElementById('adminTools').classList.toggle('hidden', !isSuperAdmin);
+        
+        // Show appropriate nav buttons
+        document.getElementById('navDashboard').classList.toggle('hidden', !isApprovedCreator && !isMasterAdmin);
+        document.getElementById('navAdmin').classList.toggle('hidden', !isMasterAdmin);
+        
         goToLanding();
     }
 
-    function canManageStory(story) {
-        if (!currentUser || currentUser.isGuest) return false;
-        return isSuperAdmin || isEditor || currentUser.$id === story.creatorId || 
-               (story.admins && story.admins.split(',').includes(currentUser.$id));
-    }
-
-    // View navigation
     function showView(view) {
-        document.getElementById('landingView').classList.add('hidden');
-        document.getElementById('storyView').classList.add('hidden');
-        document.getElementById('writerDesk').classList.add('hidden');
-        document.getElementById('creatorDashboard').classList.add('hidden');
-        const map = { landing: 'landingView', story: 'storyView', writer: 'writerDesk', dashboard: 'creatorDashboard' };
+        ['landingView','storyView','writerDesk','creatorDashboard','adminPanel'].forEach(id => {
+            document.getElementById(id).classList.add('hidden');
+        });
+        const map = { landing:'landingView', story:'storyView', writer:'writerDesk', dashboard:'creatorDashboard', admin:'adminPanel' };
         if (map[view]) document.getElementById(map[view]).classList.remove('hidden');
-        document.getElementById('navHome').classList.toggle('active', view !== 'dashboard');
-        document.getElementById('navDashboard').classList.toggle('active', view === 'dashboard');
+        ['navHome','navDashboard','navAdmin'].forEach(id => document.getElementById(id).classList.remove('active'));
+        if (view === 'dashboard') document.getElementById('navDashboard').classList.add('active');
+        else if (view === 'admin') document.getElementById('navAdmin').classList.add('active');
+        else document.getElementById('navHome').classList.add('active');
     }
 
     function goToLanding() { showView('landing'); loadStories(); loadTotalVisits(); }
@@ -365,23 +376,29 @@
     };
     
     function goToWriterDesk() { showView('writer'); loadWriterDesk(); }
-
-    function goToDashboard() {
-        if (!currentUser || currentUser.isGuest) { alert('Please login.'); return; }
-        showView('dashboard');
-        loadDashboard();
+    function goToDashboard() { 
+        if (!isApprovedCreator && !isMasterAdmin) { alert('Only approved creators can access the dashboard.'); return; }
+        showView('dashboard'); loadCreatorDashboard(); 
+    }
+    function goToAdminPanel() {
+        if (!isMasterAdmin) { alert('Access denied.'); return; }
+        showView('admin'); loadAdminPanel();
     }
 
     async function recordVisit(storyId) {
-        const visitorId = currentUser ? currentUser.$id : 'anonymous-' + Date.now();
-        try { await databases.createDocument(DATABASE_ID, VISITS_COLLECTION, Appwrite.ID.unique(), { storyId, visitorId, visitedAt: new Date().toISOString() }); } catch (e) {}
+        try {
+            await databases.createDocument(DATABASE_ID, VISITS_COLLECTION, Appwrite.ID.unique(), {
+                storyId, visitorId: currentUser ? currentUser.$id : 'anon-' + Date.now(),
+                visitedAt: new Date().toISOString()
+            });
+        } catch (e) { /* ignore */ }
     }
 
     async function loadTotalVisits() {
         try {
             const res = await databases.listDocuments(DATABASE_ID, VISITS_COLLECTION);
             document.getElementById('totalVisits').textContent = '📊 ' + (res.total || res.documents.length) + ' visits';
-        } catch (err) { document.getElementById('totalVisits').textContent = '📊 0 visits'; }
+        } catch (e) { document.getElementById('totalVisits').textContent = '📊 0 visits'; }
     }
 
     // ========== LANDING PAGE ==========
@@ -398,35 +415,48 @@
                 const statusClass = story.status === 'completed' ? 'status-completed' : 'status-active';
                 const statusText = story.status === 'completed' ? '✓ Completed' : '✍️ In Progress';
                 const completedDate = story.completedAt ? new Date(story.completedAt).toLocaleDateString() : '';
+                // Get writers from actual chapter submissions, in order
                 const writers = story.writers ? story.writers.split(',').map(w => w.trim()) : [story.creatorName];
                 const displayWriters = writers.slice(0, 2).join(', ');
                 const moreWriters = writers.length > 2 ? ` +${writers.length - 2} more` : '';
-                return `<div class="card" onclick="goToStory('${story.$id}')" style="cursor:pointer;" oncontextmenu="event.preventDefault(); showStoryPopup('${story.$id}'); return false;">
-                    <h3>${story.title}</h3>
-                    <p style="font-size:0.85rem; color:#7f8c8d;">${story.description || ''}</p>
-                    <div style="margin-top:0.5rem;"><span class="badge ${statusClass}">${statusText}</span>${completedDate ? `<span class="badge">📅 ${completedDate}</span>` : ''}</div>
-                    <div style="margin-top:0.3rem; font-size:0.8rem; color:#555;">👥 ${displayWriters}${moreWriters}</div>
-                </div>`;
+                return `
+                    <div class="card" onclick="goToStory('${story.$id}')" style="cursor:pointer;"
+                         oncontextmenu="event.preventDefault(); showStoryPopup('${story.$id}'); return false;">
+                        <h3>${story.title}</h3>
+                        <p style="font-size:0.85rem; color:#7f8c8d;">${story.description || ''}</p>
+                        <div style="margin-top:0.5rem;">
+                            <span class="badge ${statusClass}">${statusText}</span>
+                            ${completedDate ? `<span class="badge">📅 ${completedDate}</span>` : ''}
+                        </div>
+                        <div style="margin-top:0.3rem; font-size:0.8rem; color:#555;">
+                            👥 ${displayWriters}${moreWriters}
+                        </div>
+                    </div>
+                `;
             }).join('');
-        } catch (err) { listEl.innerHTML = '<p>Error loading stories.</p>'; }
+        } catch (err) {
+            listEl.innerHTML = '<p>Error loading stories: ' + err.message + '</p>';
+        }
     }
 
     // Popup with writers in submission order
     window.showStoryPopup = async function(storyId) {
         try {
             const story = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, storyId);
-            // Get writers from chapters in submission order
+            // Get writers from actual chapter submissions in order
             const chaptersRes = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, [
                 Appwrite.Query.equal('storyId', storyId),
                 Appwrite.Query.orderAsc('chapterNumber')
             ]);
-            const writerOrder = [...new Set(chaptersRes.documents.map(ch => ch.authorName))];
+            const writersInOrder = chaptersRes.documents.map(ch => ch.authorName);
+            const uniqueWriters = [...new Set(writersInOrder)]; // Remove duplicates but keep order
+            
             document.getElementById('popupContent').innerHTML = `
                 <h3>${story.title}</h3>
                 <p><strong>Status:</strong> ${story.status}</p>
                 <p><strong>Genre:</strong> ${story.genre || 'Not specified'}</p>
-                <p><strong>Writers (in order):</strong></p>
-                <ol>${writerOrder.map(w => '<li>' + w + '</li>').join('')}</ol>
+                <p><strong>Writers (in order of submission):</strong></p>
+                <ol>${uniqueWriters.map(w => '<li>' + w + '</li>').join('')}</ol>
                 ${story.completedAt ? '<p><strong>Completed:</strong> ' + new Date(story.completedAt).toLocaleDateString() + '</p>' : ''}
                 <button onclick="closePopup()" style="margin-top:1rem;">Close</button>
             `;
@@ -447,84 +477,104 @@
         document.getElementById('chaptersContainer').innerHTML = 'Loading...';
         try {
             currentStory = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId);
+            const isCreator = currentUser && !currentUser.isGuest && currentUser.$id === currentStory.creatorId;
+            const canWrite = currentUser && !currentUser.isGuest && currentUser.$id === currentStory.currentWriterId && currentStory.status !== 'completed';
+            const isStoryAdmin = isCreator || (currentStory.admins && currentStory.admins.includes(currentUser.$id)) || isMasterAdmin || isEditor;
             const isCompleted = currentStory.status === 'completed';
-            const canManage = canManageStory(currentStory);
             
             // Likes
             let likeCount = 0, userLiked = false;
             try {
-                const likesRes = await databases.listDocuments(DATABASE_ID, LIKES_COLLECTION, [Appwrite.Query.equal('storyId', currentStoryId)]);
+                const likesRes = await databases.listDocuments(DATABASE_ID, LIKES_COLLECTION, [
+                    Appwrite.Query.equal('storyId', currentStoryId)
+                ]);
                 likeCount = likesRes.total || likesRes.documents.length;
                 if (currentUser && !currentUser.isGuest) userLiked = likesRes.documents.some(l => l.userId === currentUser.$id);
-            } catch (e) {}
-
-            // Comments
-            let commentCount = 0;
-            try {
-                const commentsRes = await databases.listDocuments(DATABASE_ID, COMMENTS_COLLECTION, [Appwrite.Query.equal('storyId', currentStoryId)]);
-                commentCount = commentsRes.total || commentsRes.documents.length;
-            } catch (e) {}
+            } catch (e) { /* ignore */ }
 
             document.getElementById('storyHeader').innerHTML = `
                 <div class="flex-between">
                     <div>
-                        <h2>${currentStory.title}</h2>
+                        <h2>${currentStory.title} ${isCompleted ? '🏁' : ''}</h2>
                         <p style="color:#7f8c8d;">${currentStory.genre ? 'Genre: ' + currentStory.genre : ''}</p>
                         <p>Created by: <span class="badge">${currentStory.creatorName}</span></p>
-                        <p>Status: <span class="badge ${isCompleted ? 'status-completed' : 'status-active'}">${currentStory.status}</span></p>
+                        ${isMasterAdmin || isEditor ? '<p><span class="badge admin">Admin View</span></p>' : ''}
                     </div>
                     <div style="text-align:right;">
-                        <button class="heart-btn ${userLiked ? 'liked' : ''}" onclick="toggleLike('${currentStoryId}')">${userLiked ? '❤️' : '🤍'} <span id="likeCount">${likeCount}</span></button>
-                        <button class="comment-btn" onclick="showCommentBox('${currentStoryId}')">💬 <span id="commentCount">${commentCount}</span></button>
+                        <button class="heart-btn ${userLiked ? 'liked' : ''}" onclick="toggleLike('${currentStoryId}')">
+                            ${userLiked ? '❤️' : '🤍'} <span id="likeCount">${likeCount}</span>
+                        </button>
+                        <button class="comment-btn" onclick="toggleCommentForm()" title="Add comment">💬 Comment</button>
                     </div>
                 </div>
-                <div id="commentsDisplay" class="comment-section"></div>
             `;
-            
-            // Load comments display
-            loadComments();
 
-            // Story actions
+            // Story actions (edit for admin/editor)
             const actionsDiv = document.getElementById('storyActions');
-            const inviteSection = document.getElementById('inviteSection');
-            const editSection = document.getElementById('editSection');
-            editSection.classList.add('hidden');
+            if (isStoryAdmin) {
+                actionsDiv.innerHTML = `
+                    <button onclick="editStory('${currentStoryId}')" class="warn small">✏️ Edit Story</button>
+                    <button onclick="editSession('${currentStoryId}')" class="small">📝 Edit Last Session</button>
+                `;
+            } else {
+                actionsDiv.innerHTML = '';
+            }
+
+            // Write access
+            const contributeBtn = document.getElementById('contributeBtn');
+            const waitingSection = document.getElementById('waitingSection');
             
             if (isCompleted) {
-                actionsDiv.innerHTML = '<p style="color:#7f8c8d;">📖 This story is completed. No more contributions can be made.</p>';
-                inviteSection.classList.add('hidden');
-            } else if (canManage) {
-                actionsDiv.innerHTML = `
-                    <button id="contributeBtn" class="success">✍️ Write</button>
-                    <button id="editStoryBtn" class="outline small">✏️ Edit Story</button>
-                `;
-                document.getElementById('contributeBtn').addEventListener('click', goToWriterDesk);
-                document.getElementById('editStoryBtn').addEventListener('click', showEditSection);
-                inviteSection.classList.remove('hidden');
-                loadInvites();
-            } else if (currentUser && !currentUser.isGuest && currentUser.$id === currentStory.currentWriterId) {
-                actionsDiv.innerHTML = '<button id="contributeBtn" class="success">✍️ Contribute (It\'s Your Turn!)</button>';
-                document.getElementById('contributeBtn').addEventListener('click', goToWriterDesk);
-                inviteSection.classList.add('hidden');
+                contributeBtn.classList.add('hidden');
+                waitingSection.innerHTML = '<p style="color:#2980b9;">🏁 This story is completed. No more contributions can be made.</p>';
+                waitingSection.classList.remove('hidden');
+            } else if (canWrite) {
+                contributeBtn.classList.remove('hidden');
+                contributeBtn.onclick = goToWriterDesk;
+                waitingSection.classList.add('hidden');
             } else if (currentUser && !currentUser.isGuest) {
-                actionsDiv.innerHTML = `
-                    <button disabled>⏳ Waiting for Your Turn</button>
-                    <button id="passwordEntryBtn" class="outline small">🔑 Enter Password</button>
+                contributeBtn.classList.add('hidden');
+                // Show password entry ONLY ONCE
+                waitingSection.innerHTML = `
+                    <div style="margin:1rem 0;">
+                        <button id="waitingBtn" disabled>⏳ Waiting for Your Turn</button>
+                        <button id="passwordEntryBtn" class="outline small" style="margin-left:0.5rem;">🔑 Enter Password</button>
+                    </div>
                 `;
+                waitingSection.classList.remove('hidden');
                 document.getElementById('passwordEntryBtn').addEventListener('click', () => {
                     const pw = prompt("Enter the story access password:");
                     if (pw && pw === currentStory.accessPassword) {
-                        currentStory.currentWriterId = currentUser.$id;
-                        loadStoryView();
-                    } else { alert("Incorrect password."); }
+                        // Check consecutive session rule
+                        if (currentStory.lastWriterId === currentUser.$id) {
+                            alert("You wrote the last session. Someone else must write before you can contribute again.");
+                            return;
+                        }
+                        databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId, {
+                            currentWriterId: currentUser.$id
+                        }).then(() => {
+                            currentStory.currentWriterId = currentUser.$id;
+                            goToWriterDesk();
+                        });
+                    } else {
+                        alert("Incorrect password.");
+                    }
                 });
-                inviteSection.classList.add('hidden');
             } else {
-                actionsDiv.innerHTML = '';
+                contributeBtn.classList.add('hidden');
+                waitingSection.classList.add('hidden');
+            }
+
+            // Invite section
+            const inviteSection = document.getElementById('inviteSection');
+            if (isStoryAdmin && !isCompleted) {
+                inviteSection.classList.remove('hidden');
+                loadInvites();
+            } else {
                 inviteSection.classList.add('hidden');
             }
-            
-            // Load chapters
+
+            // Chapters
             const chaptersRes = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, [
                 Appwrite.Query.equal('storyId', currentStoryId),
                 Appwrite.Query.orderAsc('chapterNumber')
@@ -533,91 +583,72 @@
             if (chapters.length === 0) {
                 document.getElementById('chaptersContainer').innerHTML = '<p>No sessions yet. Be the first to contribute!</p>';
             } else {
-                document.getElementById('chaptersContainer').innerHTML = chapters.map(ch => `
-                    <div class="card">
+                document.getElementById('chaptersContainer').innerHTML = chapters.map((ch, i) => `
+                    <div class="card" id="session-${ch.$id}">
                         <h4>Session ${ch.chapterNumber} — by <span class="badge writer">${ch.authorName}</span></h4>
-                        <p style="white-space:pre-wrap">${ch.content}</p>
+                        <p style="white-space:pre-wrap" id="content-${ch.$id}">${ch.content}</p>
                         <small>${new Date(ch.$createdAt).toLocaleString()}</small>
-                        ${canManage ? `<button class="small outline" onclick="editSession('${ch.$id}', '${ch.content.replace(/'/g, "\\'")}')" style="margin-left:1rem;">✏️ Edit</button>` : ''}
                     </div>
                 `).join('');
             }
-        } catch (err) { document.getElementById('chaptersContainer').innerHTML = '<p>Error loading story.</p>'; }
+
+            // Comments
+            loadComments();
+            document.getElementById('commentForm').classList.toggle('hidden', !currentUser || currentUser.isGuest);
+            
+        } catch (err) {
+            document.getElementById('chaptersContainer').innerHTML = '<p>Error loading story.</p>';
+        }
     }
 
-    // Edit story
-    function showEditSection() {
-        const editSection = document.getElementById('editSection');
-        editSection.classList.remove('hidden');
-        editSection.innerHTML = `
-            <div class="card editing-indicator">
-                <h4>✏️ Edit Story</h4>
-                <input type="text" id="editTitle" value="${currentStory.title}" placeholder="Title">
-                <input type="text" id="editGenre" value="${currentStory.genre || ''}" placeholder="Genre">
-                <textarea id="editDesc" rows="2">${currentStory.description || ''}</textarea>
-                <button id="saveEditBtn" class="success small">Save Changes</button>
-                <button id="cancelEditBtn" class="small">Cancel</button>
-            </div>
-        `;
-        document.getElementById('saveEditBtn').addEventListener('click', async () => {
-            await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId, {
-                title: document.getElementById('editTitle').value,
-                genre: document.getElementById('editGenre').value,
-                description: document.getElementById('editDesc').value
-            });
-            alert('Story updated!');
-            loadStoryView();
-        });
-        document.getElementById('cancelEditBtn').addEventListener('click', () => editSection.classList.add('hidden'));
-    }
-
-    // Edit session
-    window.editSession = function(sessionId, content) {
-        const newContent = prompt("Edit session content (max 300 words):", content);
-        if (!newContent) return;
-        const words = newContent.trim().split(/\s+/).filter(w => w.length > 0);
-        if (words.length > 300) { alert('Max 300 words.'); return; }
-        (async () => {
-            await databases.updateDocument(DATABASE_ID, CHAPTERS_COLLECTION, sessionId, {
-                content: newContent,
-                wordCount: words.length
-            });
-            alert('Session updated!');
-            loadStoryView();
-        })();
+    // Toggle comment form
+    window.toggleCommentForm = function() {
+        if (!currentUser || currentUser.isGuest) {
+            alert('Please login to comment.');
+            return;
+        }
+        document.getElementById('commentForm').classList.toggle('hidden');
     };
 
-    // Comments
+    // Post comment
+    document.getElementById('postCommentBtn').addEventListener('click', async () => {
+        const content = document.getElementById('commentInput').value.trim();
+        if (!content) return;
+        const wordCount = content.split(/\s+/).length;
+        if (wordCount > 15) { alert('Maximum 15 words allowed.'); return; }
+        try {
+            await databases.createDocument(DATABASE_ID, COMMENTS_COLLECTION, Appwrite.ID.unique(), {
+                storyId: currentStoryId,
+                userId: currentUser.$id,
+                userName: currentUser.name || 'Writer',
+                content: content,
+                createdAt: new Date().toISOString()
+            });
+            document.getElementById('commentInput').value = '';
+            loadComments();
+        } catch (err) { alert('Error: ' + err.message); }
+    });
+
     async function loadComments() {
-        const display = document.getElementById('commentsDisplay');
-        if (!display) return;
+        const listEl = document.getElementById('commentsList');
         try {
             const res = await databases.listDocuments(DATABASE_ID, COMMENTS_COLLECTION, [
                 Appwrite.Query.equal('storyId', currentStoryId),
-                Appwrite.Query.orderDesc('$createdAt'),
-                Appwrite.Query.limit(5)
+                Appwrite.Query.orderDesc('createdAt'),
+                Appwrite.Query.limit(20)
             ]);
-            if (res.documents.length === 0) { display.innerHTML = ''; return; }
-            display.innerHTML = res.documents.map(c => 
-                `<div class="comment-item"><strong>${c.userName}:</strong> ${c.text} <small>(${new Date(c.createdAt).toLocaleDateString()})</small></div>`
-            ).join('');
-        } catch (e) { display.innerHTML = ''; }
+            if (res.documents.length === 0) {
+                listEl.innerHTML = '<p style="font-size:0.8rem; color:#aaa;">No comments yet.</p>';
+                return;
+            }
+            listEl.innerHTML = res.documents.map(c => `
+                <div style="padding:0.3rem 0; font-size:0.85rem; border-bottom:1px solid #f0f0f0;">
+                    <strong>${c.userName}:</strong> ${c.content}
+                    <span style="color:#aaa; font-size:0.7rem; margin-left:0.5rem;">${new Date(c.createdAt).toLocaleDateString()}</span>
+                </div>
+            `).join('');
+        } catch (e) { listEl.innerHTML = ''; }
     }
-
-    window.showCommentBox = function(storyId) {
-        if (!currentUser || currentUser.isGuest) { alert('Please login to comment.'); return; }
-        const text = prompt("Add a comment (max 15 words):");
-        if (!text) return;
-        const words = text.trim().split(/\s+/).filter(w => w.length > 0);
-        if (words.length > 15) { alert('Max 15 words.'); return; }
-        (async () => {
-            await databases.createDocument(DATABASE_ID, COMMENTS_COLLECTION, Appwrite.ID.unique(), {
-                storyId, userId: currentUser.$id, userName: currentUser.name,
-                text: text.trim(), createdAt: new Date().toISOString()
-            });
-            loadStoryView();
-        })();
-    };
 
     // Toggle like
     window.toggleLike = async function(storyId) {
@@ -630,11 +661,98 @@
             if (existing.documents.length > 0) {
                 await databases.deleteDocument(DATABASE_ID, LIKES_COLLECTION, existing.documents[0].$id);
             } else {
-                await databases.createDocument(DATABASE_ID, LIKES_COLLECTION, Appwrite.ID.unique(), { storyId, userId: currentUser.$id });
+                await databases.createDocument(DATABASE_ID, LIKES_COLLECTION, Appwrite.ID.unique(), {
+                    storyId, userId: currentUser.$id
+                });
             }
             loadStoryView();
-        } catch (err) {}
+        } catch (err) { console.error('Like error:', err); }
     };
+
+    // Edit story (admin/editor only)
+    window.editStory = async function(storyId) {
+        const story = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, storyId);
+        document.getElementById('editPopup').innerHTML = `
+            <h3>Edit Story: ${story.title}</h3>
+            <input type="text" id="editTitle" value="${story.title}" placeholder="Title">
+            <input type="text" id="editGenre" value="${story.genre || ''}" placeholder="Genre">
+            <textarea id="editDesc" rows="2" placeholder="Description">${story.description || ''}</textarea>
+            <input type="text" id="editPassword" value="${story.accessPassword || ''}" placeholder="Access password">
+            <input type="text" id="editAdmins" value="${story.admins || ''}" placeholder="Admin IDs (comma-separated)">
+            <div style="margin-top:1rem;">
+                <button onclick="saveEditStory('${storyId}')" class="success">Save Changes</button>
+                <button onclick="closeEditPopup()">Cancel</button>
+            </div>
+        `;
+        document.getElementById('editOverlay').classList.remove('hidden');
+        document.getElementById('editPopup').classList.remove('hidden');
+    };
+
+    window.saveEditStory = async function(storyId) {
+        const title = document.getElementById('editTitle').value.trim();
+        const genre = document.getElementById('editGenre').value.trim();
+        const desc = document.getElementById('editDesc').value.trim();
+        const password = document.getElementById('editPassword').value.trim();
+        const admins = document.getElementById('editAdmins').value.trim();
+        try {
+            await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, storyId, {
+                title, genre, description: desc, accessPassword: password, admins
+            });
+            alert('Story updated!');
+            closeEditPopup();
+            loadStoryView();
+            loadStories();
+        } catch (err) { alert('Error: ' + err.message); }
+    };
+
+    // Edit last session (admin/editor only)
+    window.editSession = async function(storyId) {
+        try {
+            const res = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, [
+                Appwrite.Query.equal('storyId', storyId),
+                Appwrite.Query.orderDesc('chapterNumber'),
+                Appwrite.Query.limit(1)
+            ]);
+            if (res.documents.length === 0) { alert('No sessions to edit.'); return; }
+            const session = res.documents[0];
+            document.getElementById('editPopup').innerHTML = `
+                <h3>Edit Session ${session.chapterNumber}</h3>
+                <p>Author: ${session.authorName}</p>
+                <textarea id="editContent" rows="10">${session.content}</textarea>
+                <p style="font-size:0.8rem;">Word count: <span id="editWordCount">${session.wordCount}</span>/300</p>
+                <div style="margin-top:1rem;">
+                    <button onclick="saveEditSession('${session.$id}')" class="success">Save Changes</button>
+                    <button onclick="closeEditPopup()">Cancel</button>
+                </div>
+            `;
+            document.getElementById('editOverlay').classList.remove('hidden');
+            document.getElementById('editPopup').classList.remove('hidden');
+            document.getElementById('editContent').addEventListener('input', function() {
+                const wc = this.value.trim().split(/\s+/).filter(w=>w.length>0).length;
+                document.getElementById('editWordCount').textContent = wc;
+            });
+        } catch (err) { alert('Error: ' + err.message); }
+    };
+
+    window.saveEditSession = async function(sessionId) {
+        const content = document.getElementById('editContent').value.trim();
+        const wordCount = content.split(/\s+/).filter(w=>w.length>0).length;
+        if (wordCount > 300) { alert('Maximum 300 words.'); return; }
+        try {
+            await databases.updateDocument(DATABASE_ID, CHAPTERS_COLLECTION, sessionId, {
+                content, wordCount
+            });
+            alert('Session updated!');
+            closeEditPopup();
+            loadStoryView();
+        } catch (err) { alert('Error: ' + err.message); }
+    };
+
+    window.closeEditPopup = function() {
+        document.getElementById('editOverlay').classList.add('hidden');
+        document.getElementById('editPopup').classList.add('hidden');
+    };
+    document.getElementById('editOverlay').addEventListener('click', window.closeEditPopup);
 
     // ========== INVITE SYSTEM ==========
     document.getElementById('sendInviteBtn').addEventListener('click', async () => {
@@ -647,7 +765,6 @@
             });
             document.getElementById('inviteIdentifier').value = '';
             loadInvites();
-            alert('Writer invited! Password: ' + (currentStory.accessPassword || 'not set'));
         } catch (err) { alert('Error: ' + err.message); }
     });
 
@@ -657,30 +774,33 @@
         try {
             await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId, { accessPassword: password });
             currentStory.accessPassword = password;
-            alert('Password set: ' + password);
+            alert('Password set!');
         } catch (err) { alert('Error: ' + err.message); }
     });
 
     async function loadInvites() {
         const inviteList = document.getElementById('inviteList');
         try {
-            const res = await databases.listDocuments(DATABASE_ID, INVITATIONS_COLLECTION, [Appwrite.Query.equal('storyId', currentStoryId)]);
+            const res = await databases.listDocuments(DATABASE_ID, INVITATIONS_COLLECTION, [
+                Appwrite.Query.equal('storyId', currentStoryId)
+            ]);
             if (res.documents.length === 0) { inviteList.innerHTML = '<p>No invitations yet.</p>'; return; }
             inviteList.innerHTML = '<h4>Invited Writers:</h4>' + res.documents.map(inv => `
                 <div class="card" style="padding:0.8rem;">
                     <div class="flex-between">
                         <div><p>👤 ${inv.email}</p><span class="badge">${inv.status}</span></div>
-                        <button onclick="assignTurn('${inv.$id}', '${inv.email}')" class="success small">🎯 Give Turn</button>
+                        ${currentStory.status !== 'completed' ? `<button onclick="assignTurn('${inv.$id}', '${inv.email}')" class="success small">🎯 Give Turn</button>` : ''}
                     </div>
-                </div>`).join('');
+                </div>
+            `).join('');
         } catch (err) { inviteList.innerHTML = '<p>Error loading invitations.</p>'; }
     }
 
     window.assignTurn = async function(inviteId, identifier) {
         if (currentStory.status === 'completed') { alert('This story is completed.'); return; }
-        // Prevent consecutive sessions
-        if (currentStory.lastWriterId === inviteId || (currentUser && currentUser.$id === currentStory.lastWriterId)) {
-            alert('This writer just completed a session. Please assign a different writer.');
+        // Check consecutive session rule
+        if (currentStory.lastWriterId === inviteId) {
+            alert("This writer wrote the last session. Someone else must write before they can contribute again.");
             return;
         }
         try {
@@ -688,38 +808,32 @@
             await databases.updateDocument(DATABASE_ID, INVITATIONS_COLLECTION, inviteId, { status: 'accepted' });
             const writers = (currentStory.writers || currentStory.creatorName) + ',' + identifier;
             await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId, { writers });
-            alert('Turn assigned to ' + identifier + '!');
+            alert(`Turn assigned to ${identifier}!`);
             currentStory = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId);
             loadStoryView(); loadInvites();
         } catch (err) { alert('Error: ' + err.message); }
     };
 
     // ========== WRITER'S DESK ==========
-    document.getElementById('backToStoryBtn').addEventListener('click', () => { if (currentStoryId) window.goToStory(currentStoryId); });
-    document.getElementById('newStoryFromDeskBtn').addEventListener('click', () => createNewStory());
+    document.getElementById('backToStoryBtn').addEventListener('click', () => {
+        if (currentStoryId) window.goToStory(currentStoryId);
+    });
+    document.getElementById('newStoryFromDeskBtn').addEventListener('click', () => { createNewStory(); });
 
     const chapterText = document.getElementById('chapterText');
-    const wordCountDisplay = document.getElementById('wordCountDisplay');
-    const wordProgress = document.getElementById('wordProgress');
-    const wordWarning = document.getElementById('wordWarning');
-    const draftStatus = document.getElementById('draftStatus');
-
     chapterText.addEventListener('input', () => {
-        const text = chapterText.value;
-        const words = text.trim().split(/\s+/).filter(w => w.length > 0);
+        const words = chapterText.value.trim().split(/\s+/).filter(w => w.length > 0);
         const count = words.length;
-        wordCountDisplay.textContent = count;
+        document.getElementById('wordCountDisplay').textContent = count;
         const pct = Math.min((count / 300) * 100, 100);
-        wordProgress.style.width = pct + '%';
-        wordProgress.classList.toggle('over-limit', count > 300);
-        wordWarning.classList.toggle('hidden', count <= 300);
+        document.getElementById('wordProgress').style.width = pct + '%';
+        document.getElementById('wordProgress').classList.toggle('over-limit', count > 300);
+        document.getElementById('wordWarning').classList.toggle('hidden', count <= 300);
     });
 
-    document.getElementById('saveDraftBtn').addEventListener('click', saveDraft);
-    
-    async function saveDraft() {
+    document.getElementById('saveDraftBtn').addEventListener('click', async () => {
         const content = chapterText.value;
-        draftStatus.textContent = 'Saving...';
+        document.getElementById('draftStatus').textContent = 'Saving...';
         try {
             const existing = await databases.listDocuments(DATABASE_ID, DRAFTS_COLLECTION, [
                 Appwrite.Query.equal('storyId', currentStoryId),
@@ -727,48 +841,63 @@
             ]);
             const wc = content.trim().split(/\s+/).filter(w => w.length > 0).length;
             if (existing.documents.length > 0) {
-                await databases.updateDocument(DATABASE_ID, DRAFTS_COLLECTION, existing.documents[0].$id, { content, wordCount: wc, lastModified: new Date().toISOString() });
+                await databases.updateDocument(DATABASE_ID, DRAFTS_COLLECTION, existing.documents[0].$id, {
+                    content, wordCount: wc, lastModified: new Date().toISOString()
+                });
             } else {
-                await databases.createDocument(DATABASE_ID, DRAFTS_COLLECTION, Appwrite.ID.unique(), { storyId: currentStoryId, authorId: currentUser.$id, content, wordCount: wc, lastModified: new Date().toISOString() });
+                await databases.createDocument(DATABASE_ID, DRAFTS_COLLECTION, Appwrite.ID.unique(), {
+                    storyId: currentStoryId, authorId: currentUser.$id, content, wordCount: wc, lastModified: new Date().toISOString()
+                });
             }
-            draftStatus.textContent = 'Draft saved at ' + new Date().toLocaleTimeString();
-        } catch (err) { draftStatus.textContent = 'Error saving draft.'; }
-    }
+            document.getElementById('draftStatus').textContent = 'Draft saved at ' + new Date().toLocaleTimeString();
+        } catch (err) { document.getElementById('draftStatus').textContent = 'Error saving draft.'; }
+    });
 
     document.getElementById('submitChapterBtn').addEventListener('click', async () => {
         if (!currentStoryId) { alert('No story selected.'); return; }
-        if (currentStory.status === 'completed') { alert('This story is completed. No more submissions allowed.'); return; }
-        
+        if (currentStory.status === 'completed') { alert('This story is completed.'); return; }
+        // Check consecutive session rule
+        if (currentStory.lastWriterId === currentUser.$id) {
+            alert("You wrote the last session. Someone else must write before you can contribute again.");
+            return;
+        }
         const content = chapterText.value.trim();
         if (!content) { alert('Write something first.'); return; }
-        const wc = content.split(/\s+/).filter(w => w.length > 0).length;
-        if (wc > 300) { alert('Please shorten to 300 words or less.'); return; }
-        
+        const wordCount = content.split(/\s+/).filter(w => w.length > 0).length;
+        if (wordCount > 300) { alert('Please shorten to 300 words or less.'); return; }
         try {
-            const chaptersRes = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, [Appwrite.Query.equal('storyId', currentStoryId)]);
+            const chaptersRes = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, [
+                Appwrite.Query.equal('storyId', currentStoryId)
+            ]);
             const nextNumber = chaptersRes.documents.length + 1;
-            
             await databases.createDocument(DATABASE_ID, CHAPTERS_COLLECTION, Appwrite.ID.unique(), {
                 storyId: currentStoryId, chapterNumber: nextNumber, content,
-                authorId: currentUser.$id, authorName: currentUser.name || 'Writer', wordCount: wc, status: 'published'
+                authorId: currentUser.$id, authorName: currentUser.name || 'Writer', wordCount, status: 'published'
             });
-            
-            // Update last writer and clear turn
+            // Clear turn and record last writer
             await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId, {
-                currentWriterId: '',
-                lastWriterId: currentUser.$id
+                currentWriterId: '', lastWriterId: currentUser.$id
             });
-            
+            // Add to writers list
+            const writers = (currentStory.writers || currentStory.creatorName);
+            if (!writers.includes(currentUser.name)) {
+                await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId, {
+                    writers: writers + ',' + currentUser.name
+                });
+            }
             chapterText.value = '';
-            wordCountDisplay.textContent = '0'; wordProgress.style.width = '0%';
-            wordProgress.classList.remove('over-limit'); wordWarning.classList.add('hidden');
-            draftStatus.textContent = 'Session submitted! ✅';
-            
+            document.getElementById('wordCountDisplay').textContent = '0';
+            document.getElementById('wordProgress').style.width = '0%';
+            document.getElementById('wordProgress').classList.remove('over-limit');
+            document.getElementById('wordWarning').classList.add('hidden');
+            document.getElementById('draftStatus').textContent = 'Session submitted! ✅';
+            // Clean draft
             const draftDocs = await databases.listDocuments(DATABASE_ID, DRAFTS_COLLECTION, [
                 Appwrite.Query.equal('storyId', currentStoryId), Appwrite.Query.equal('authorId', currentUser.$id)
             ]);
-            if (draftDocs.documents.length > 0) await databases.deleteDocument(DATABASE_ID, DRAFTS_COLLECTION, draftDocs.documents[0].$id);
-            
+            if (draftDocs.documents.length > 0) {
+                await databases.deleteDocument(DATABASE_ID, DRAFTS_COLLECTION, draftDocs.documents[0].$id);
+            }
             currentStory = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId);
             loadPreviousSessions();
             setTimeout(() => window.goToStory(currentStoryId), 1500);
@@ -776,50 +905,53 @@
     });
 
     async function loadWriterDesk() {
-        if (currentStory && currentStory.status === 'completed') {
-            alert('This story is completed. No more writing allowed.');
+        if (currentStory.status === 'completed') {
+            alert('This story is completed. No more contributions can be made.');
             window.goToStory(currentStoryId);
             return;
         }
         if (!currentStory) {
-            try { currentStory = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId); } catch (e) { goToLanding(); return; }
+            try { currentStory = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId); }
+            catch (e) { alert('Could not load story.'); goToLanding(); return; }
         }
-        if (currentStory.status === 'completed') {
-            alert('This story is completed.');
-            window.goToStory(currentStoryId);
-            return;
-        }
-        
-        const canManage = canManageStory(currentStory);
+        const isCreator = currentUser && !currentUser.isGuest && currentUser.$id === currentStory.creatorId;
+        const isStoryAdmin = isCreator || (currentStory.admins && currentStory.admins.includes(currentUser.$id)) || isMasterAdmin || isEditor;
         const hasTurn = currentUser && !currentUser.isGuest && currentUser.$id === currentStory.currentWriterId;
         
-        if (!hasTurn && !canManage) {
+        if (!hasTurn && !isStoryAdmin) {
             const password = prompt("Enter the story access password:");
             if (password && password === currentStory.accessPassword) {
+                if (currentStory.lastWriterId === currentUser.$id) {
+                    alert("You wrote the last session. Someone else must write before you can contribute again.");
+                    window.goToStory(currentStoryId);
+                    return;
+                }
                 await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId, { currentWriterId: currentUser.$id });
                 currentStory.currentWriterId = currentUser.$id;
-            } else { alert("Incorrect password or no turn."); window.goToStory(currentStoryId); return; }
+            } else {
+                alert("Incorrect password or you don't have a turn.");
+                window.goToStory(currentStoryId);
+                return;
+            }
         }
-        
-        // Prevent consecutive sessions for non-managers
-        if (hasTurn && !canManage && currentStory.lastWriterId === currentUser.$id) {
-            alert('You just wrote the last session. Please wait for someone else to contribute.');
+        // Check consecutive session for story admins too
+        if (currentStory.lastWriterId === currentUser.$id && hasTurn && !isStoryAdmin) {
+            alert("You wrote the last session. Someone else must write before you can contribute again.");
             window.goToStory(currentStoryId);
             return;
         }
-        
         document.getElementById('deskStoryTitle').textContent = currentStory.title;
-        document.getElementById('newStoryFromDeskBtn').classList.toggle('hidden', !canManage);
-        
+        document.getElementById('newStoryFromDeskBtn').classList.toggle('hidden', !isStoryAdmin);
         try {
             const drafts = await databases.listDocuments(DATABASE_ID, DRAFTS_COLLECTION, [
                 Appwrite.Query.equal('storyId', currentStoryId), Appwrite.Query.equal('authorId', currentUser.$id)
             ]);
             if (drafts.documents.length > 0) {
-                chapterText.value = drafts.documents[0].content; chapterText.dispatchEvent(new Event('input'));
-                draftStatus.textContent = 'Loaded draft from ' + new Date(drafts.documents[0].lastModified).toLocaleString();
-            } else { chapterText.value = ''; draftStatus.textContent = ''; }
-        } catch (err) {}
+                chapterText.value = drafts.documents[0].content;
+                chapterText.dispatchEvent(new Event('input'));
+                document.getElementById('draftStatus').textContent = 'Loaded draft from ' + new Date(drafts.documents[0].lastModified).toLocaleString();
+            } else { chapterText.value = ''; document.getElementById('draftStatus').textContent = ''; }
+        } catch (err) { /* ignore */ }
         loadPreviousSessions();
     }
 
@@ -829,58 +961,76 @@
         prevList.innerHTML = 'Loading...'; lastSessionCard.classList.add('hidden');
         try {
             const res = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, [
-                Appwrite.Query.equal('storyId', currentStoryId), Appwrite.Query.orderDesc('chapterNumber'), Appwrite.Query.limit(5)
+                Appwrite.Query.equal('storyId', currentStoryId),
+                Appwrite.Query.orderDesc('chapterNumber'), Appwrite.Query.limit(5)
             ]);
             const chapters = res.documents;
             if (chapters.length === 0) { prevList.innerHTML = '<p>No sessions yet.</p>'; return; }
             const last = chapters[0];
             lastSessionCard.classList.remove('hidden');
-            lastSessionCard.innerHTML = `<h4>Last Session (Session ${last.chapterNumber}) — by ${last.authorName}</h4><p style="white-space:pre-wrap; margin-top:0.5rem;">${last.content}</p><small>${new Date(last.$createdAt).toLocaleString()}</small>`;
+            lastSessionCard.innerHTML = `
+                <h4>Last Session (Session ${last.chapterNumber}) — by ${last.authorName}</h4>
+                <p style="white-space:pre-wrap; margin-top:0.5rem;">${last.content}</p>
+                <small>${new Date(last.$createdAt).toLocaleString()}</small>
+            `;
             if (chapters.length > 1) {
-                prevList.innerHTML = '<h4>Earlier Sessions:</h4>' + chapters.slice(1).map(ch => `<div class="card" style="padding:0.8rem; font-size:0.85rem;"><strong>Session ${ch.chapterNumber}</strong> — ${ch.authorName}: ${ch.content.substring(0, 80)}...</div>`).join('');
+                prevList.innerHTML = '<h4>Earlier Sessions:</h4>' + chapters.slice(1).map(ch => `
+                    <div class="card" style="padding:0.8rem; font-size:0.85rem;">
+                        <strong>Session ${ch.chapterNumber}</strong> — ${ch.authorName}: ${ch.content.substring(0, 80)}...
+                    </div>
+                `).join('');
             } else { prevList.innerHTML = ''; }
         } catch (err) { prevList.innerHTML = '<p>Could not load previous sessions.</p>'; }
     }
 
-    // ========== DASHBOARD ==========
-    async function loadDashboard() {
-        if (!currentUser || currentUser.isGuest) { document.getElementById('creatorStoriesList').innerHTML = '<p>Please login.</p>'; return; }
-        
+    // ========== CREATOR DASHBOARD ==========
+    async function loadCreatorDashboard() {
         const listEl = document.getElementById('creatorStoriesList');
-        document.getElementById('maxCreatorsDisplay').textContent = maxCreators;
-        document.getElementById('adminTools').classList.toggle('hidden', !isSuperAdmin);
-        
+        if (!currentUser || currentUser.isGuest) { listEl.innerHTML = '<p>Please login.</p>'; return; }
+        if (!isApprovedCreator && !isMasterAdmin && !isEditor) {
+            listEl.innerHTML = '<p>You are not approved as a creator. Contact the admin (rotulahiri@gmail.com).</p>';
+            return;
+        }
         listEl.innerHTML = 'Loading...';
         try {
-            // Show all stories for admin/editor, only own for creator
-            let storiesRes;
-            if (isSuperAdmin || isEditor) {
-                storiesRes = await databases.listDocuments(DATABASE_ID, STORIES_COLLECTION);
+            // Show ALL stories for master admin/editor, or only own stories for approved creators
+            let res;
+            if (isMasterAdmin || isEditor) {
+                res = await databases.listDocuments(DATABASE_ID, STORIES_COLLECTION);
             } else {
-                storiesRes = await databases.listDocuments(DATABASE_ID, STORIES_COLLECTION, [
+                res = await databases.listDocuments(DATABASE_ID, STORIES_COLLECTION, [
                     Appwrite.Query.equal('creatorId', currentUser.$id)
                 ]);
             }
-            
-            let html = `<div class="card" style="margin-bottom:1.5rem; border-left:4px solid #5b6fe6; grid-column:1/-1;">
-                <h3>🛠️ Tools</h3>
-                <button onclick="createNewStory()" class="success">+ Create New Story</button>
-            </div>`;
-            
-            if (storiesRes.documents.length === 0) {
-                html += '<p style="grid-column:1/-1;">No stories found.</p>';
+            let html = `
+                <div class="card" style="margin-bottom:1.5rem; border-left:4px solid #5b6fe6; grid-column:1/-1;">
+                    <h3>🛠️ Creator Tools</h3>
+                    <p style="margin:0.5rem 0;">Create a new relay tale or manage your stories.</p>
+                    <button onclick="createNewStory()" class="success" style="margin-top:0.5rem;">+ Create New Story</button>
+                </div>
+            `;
+            if (res.documents.length === 0) {
+                html += '<p style="grid-column:1/-1;">No stories yet.</p>';
             } else {
-                html += storiesRes.documents.map(story => `
+                html += res.documents.map(story => `
                     <div class="card">
-                        <div class="flex-between"><h3>${story.title}</h3><span class="badge ${story.status==='completed'?'status-completed':'status-active'}">${story.status==='completed'?'✓ Completed':'✍️ In Progress'}</span></div>
-                        <p style="font-size:0.85rem;">Creator: ${story.creatorName} | Writers: ${story.writers||story.creatorName}</p>
-                        <p style="font-size:0.8rem;">${story.currentWriterId ? '✍️ Turn: Active' : '⏳ Turn: Unassigned'} | Password: <code>${story.accessPassword||'Not set'}</code></p>
+                        <div class="flex-between">
+                            <h3>${story.title} ${story.status === 'completed' ? '🏁' : ''}</h3>
+                            <span class="badge ${story.status === 'completed' ? 'status-completed' : 'status-active'}">${story.status === 'completed' ? '✓ Completed' : '✍️ In Progress'}</span>
+                        </div>
+                        <p style="font-size:0.85rem; color:#7f8c8d;">Genre: ${story.genre || 'None'} | By: ${story.creatorName}</p>
+                        <p style="font-size:0.8rem;">Writers: ${story.writers || story.creatorName}</p>
+                        <p style="font-size:0.8rem;">Password: <code>${story.accessPassword || 'Not set'}</code></p>
+                        <p style="font-size:0.8rem;">Last Writer: ${story.lastWriterId || 'None'} | Turn: ${story.currentWriterId ? 'Assigned' : 'Free'}</p>
                         <div class="flex-row" style="margin-top:0.5rem;">
                             <button onclick="goToStory('${story.$id}')" class="small">📖 View</button>
-                            <button onclick="goToWriterDeskFromDashboard('${story.$id}')" class="small">✍️ Write</button>
-                            ${story.status!=='completed'?`<button onclick="completeStory('${story.$id}')" class="danger small">🏁 End</button>`:`<button disabled class="small">✓ Completed</button>`}
+                            ${!story.status || story.status !== 'completed' ? `
+                                <button onclick="goToWriterDeskFromDashboard('${story.$id}')" class="small">✍️ Write</button>
+                                <button onclick="completeStory('${story.$id}')" class="danger small">🏁 End Story</button>
+                            ` : `<button disabled class="small">✓ Completed ${story.completedAt ? new Date(story.completedAt).toLocaleDateString() : ''}</button>`}
                         </div>
-                    </div>`).join('');
+                    </div>
+                `).join('');
             }
             listEl.innerHTML = html;
         } catch (err) { listEl.innerHTML = '<p>Error: ' + err.message + '</p>'; }
@@ -888,48 +1038,131 @@
 
     window.createNewStory = function() {
         if (!currentUser || currentUser.isGuest) { alert('Please login first.'); return; }
-        const title = prompt("Story title:"); if (!title) return;
+        if (!isApprovedCreator && !isMasterAdmin && !isEditor) {
+            alert('You are not approved as a creator. Contact rotulahiri@gmail.com.');
+            return;
+        }
+        const title = prompt("Story title:");
+        if (!title) return;
         const genre = prompt("Genre (optional):") || '';
         const desc = prompt("Short description:") || '';
-        const password = prompt("Set access password for writers:") || '';
+        const password = prompt("Set an access password for writers:") || '';
         (async () => {
             try {
                 await databases.createDocument(DATABASE_ID, STORIES_COLLECTION, Appwrite.ID.unique(), {
                     title, genre, description: desc,
                     creatorId: currentUser.$id, creatorName: currentUser.name,
                     editorId: '', status: 'active',
-                    currentWriterId: currentUser.$id, lastWriterId: '',
-                    turnExpires: '', completedAt: '',
-                    accessPassword: password, writers: currentUser.name, admins: ''
+                    currentWriterId: currentUser.$id, turnExpires: '',
+                    completedAt: '', accessPassword: password,
+                    writers: currentUser.name, admins: '', lastWriterId: ''
                 });
                 alert('Story created! You have the first turn.');
-                loadDashboard(); loadStories();
+                loadCreatorDashboard(); loadStories();
             } catch (err) { alert('Error: ' + err.message); }
         })();
     };
 
-    window.goToWriterDeskFromDashboard = function(storyId) { currentStoryId = storyId; goToWriterDesk(); };
+    window.goToWriterDeskFromDashboard = function(storyId) {
+        currentStoryId = storyId;
+        goToWriterDesk();
+    };
 
     window.completeStory = async function(storyId) {
         if (!confirm('End this story? No more sessions can be added.')) return;
         try {
-            await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, storyId, { status: 'completed', completedAt: new Date().toISOString(), currentWriterId: '' });
+            await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, storyId, {
+                status: 'completed', completedAt: new Date().toISOString(), currentWriterId: ''
+            });
             alert('Story completed! 🎉');
-            loadDashboard(); loadStories();
+            loadCreatorDashboard(); loadStories();
         } catch (err) { alert('Error: ' + err.message); }
     };
 
-    // ========== INIT ==========
+    // ========== ADMIN PANEL ==========
+    async function loadAdminPanel() {
+        const content = document.getElementById('adminContent');
+        try {
+            const configRes = await databases.listDocuments(DATABASE_ID, CONFIG_COLLECTION);
+            const configMap = {};
+            configRes.documents.forEach(d => { configMap[d.key] = d; });
+            
+            const approvedList = configMap['approvedCreators'] ? configMap['approvedCreators'].value : 'rotulahiri@gmail.com';
+            const maxCreators = configMap['maxCreators'] ? configMap['maxCreators'].value : '10';
+            
+            content.innerHTML = `
+                <h4>Approved Creators (Max: ${maxCreators})</h4>
+                <p style="font-size:0.8rem;">Current: ${approvedList}</p>
+                <div class="flex-row" style="margin:1rem 0;">
+                    <input type="text" id="newApprovedEmail" placeholder="Add Google-verified email" style="flex:1;">
+                    <button id="addApprovedBtn" class="success small">Add Creator</button>
+                </div>
+                <div class="flex-row" style="margin:1rem 0;">
+                    <input type="text" id="removeApprovedEmail" placeholder="Remove email" style="flex:1;">
+                    <button id="removeApprovedBtn" class="danger small">Remove</button>
+                </div>
+                <h4 style="margin-top:1rem;">Max Creators</h4>
+                <div class="flex-row">
+                    <input type="number" id="newMaxCreators" value="${maxCreators}" min="1" max="100" style="width:80px;">
+                    <button id="updateMaxBtn" class="small">Update</button>
+                </div>
+            `;
+            
+            document.getElementById('addApprovedBtn').addEventListener('click', async () => {
+                const email = document.getElementById('newApprovedEmail').value.trim();
+                if (!email) return;
+                const current = approvedList.split(',').map(e => e.trim());
+                if (current.length >= parseInt(maxCreators)) { alert('Max creators reached. Increase limit first.'); return; }
+                if (!email.includes('@gmail.com') && !email.includes('@googlemail.com')) {
+                    alert('Only Google-verified emails allowed.');
+                    return;
+                }
+                current.push(email);
+                const newValue = [...new Set(current)].join(',');
+                if (configMap['approvedCreators']) {
+                    await databases.updateDocument(DATABASE_ID, CONFIG_COLLECTION, configMap['approvedCreators'].$id, { value: newValue });
+                } else {
+                    await databases.createDocument(DATABASE_ID, CONFIG_COLLECTION, Appwrite.ID.unique(), { key: 'approvedCreators', value: newValue });
+                }
+                alert('Added!'); loadAdminPanel(); await loadAppConfig(); checkUserRoles();
+            });
+            
+            document.getElementById('removeApprovedBtn').addEventListener('click', async () => {
+                const email = document.getElementById('removeApprovedEmail').value.trim();
+                const current = approvedList.split(',').map(e => e.trim());
+                const updated = current.filter(e => e !== email);
+                const newValue = updated.join(',');
+                if (configMap['approvedCreators']) {
+                    await databases.updateDocument(DATABASE_ID, CONFIG_COLLECTION, configMap['approvedCreators'].$id, { value: newValue });
+                }
+                alert('Removed!'); loadAdminPanel(); await loadAppConfig(); checkUserRoles();
+            });
+            
+            document.getElementById('updateMaxBtn').addEventListener('click', async () => {
+                const val = document.getElementById('newMaxCreators').value;
+                if (configMap['maxCreators']) {
+                    await databases.updateDocument(DATABASE_ID, CONFIG_COLLECTION, configMap['maxCreators'].$id, { value: val });
+                } else {
+                    await databases.createDocument(DATABASE_ID, CONFIG_COLLECTION, Appwrite.ID.unique(), { key: 'maxCreators', value: val });
+                }
+                alert('Updated!'); loadAdminPanel(); await loadAppConfig();
+            });
+            
+        } catch (err) { content.innerHTML = '<p>Error: ' + err.message + '</p>'; }
+    }
+
+    // ========== INITIALIZATION ==========
     (async () => {
+        await loadAppConfig();
         try {
             const user = await account.get();
             if (user) {
                 currentUser = user;
                 currentUser.isGuest = false;
-                await checkPrivileges();
+                checkUserRoles();
                 showApp();
             }
-        } catch (e) {}
+        } catch (e) { /* not logged in */ }
     })();
 </script>
 </body>
