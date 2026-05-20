@@ -65,15 +65,14 @@
         .edit-fullscreen { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: white; z-index: 1001; padding: 2rem; overflow-y: auto; }
         .password-field { display: flex; gap: 0.3rem; align-items: center; }
         .password-field input { flex: 1; }
-        .disclaimer-text { font-size: 0.8rem; color: #7f8c8d; line-height: 1.5; max-height: 200px; overflow-y: auto; text-align: left; }
         .branch-container { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin: 1.5rem 0; }
         @media (max-width: 700px) { .branch-container { grid-template-columns: 1fr; } }
         .branch-card { border-radius: 12px; padding: 1rem; }
         .branch-card.flow1 { background: #eaf2f8; border: 2px solid #3498db; }
         .branch-card.flow2 { background: #fef5e7; border: 2px solid #e67e22; }
         .branch-card.flow3 { background: #eafaf1; border: 2px solid #2ecc71; }
-        .flow-tabs { display: flex; gap: 0.3rem; margin: 1rem 0; border-bottom: 2px solid #eee; flex-wrap: wrap; }
-        .flow-tab { padding: 0.5rem 1rem; cursor: pointer; border-radius: 8px 8px 0 0; background: #f8f9fa; border: none; font-weight: 600; color: #333; }
+        .flow-tabs { display: flex; gap: 0.3rem; margin: 1rem 0; border-bottom: 2px solid #eee; }
+        .flow-tab { padding: 0.5rem 1rem; cursor: pointer; border-radius: 8px 8px 0 0; background: #f8f9fa; border: none; font-weight: 600; }
         .flow-tab.active.flow1 { background: #3498db; color: white; }
         .flow-tab.active.flow2 { background: #e67e22; color: white; }
         .flow-tab.active.flow3 { background: #2ecc71; color: white; }
@@ -81,18 +80,6 @@
 </head>
 <body>
 <div class="container">
-    <div id="disclaimerOverlay" class="overlay"></div>
-    <div id="disclaimerPopup" class="popup" style="max-width:500px;">
-        <h3>⚠️ Disclaimer</h3>
-        <div class="disclaimer-text">
-            <p><strong>Content Disclaimer:</strong></p>
-            <p>The creator of this app has no control over, and assumes no responsibility or liability for, any content, opinions, or views expressed by users on this platform.</p>
-            <p style="margin-top:0.8rem;"><strong>Intellectual Property:</strong></p>
-            <p>The Intellectual Property Rights of the collaborative effort will rest with the platform presently.</p>
-        </div>
-        <button onclick="acceptDisclaimer()" class="success" style="margin-top:1rem; width:100%;">I Understand & Accept</button>
-    </div>
-
     <div id="authScreen">
         <div class="header-section"><h1>📚 RelayTale</h1><p class="tagline">Where writers create stories by turn</p></div>
         <div id="loginForm"><h2>Login</h2>
@@ -176,8 +163,8 @@
     const SUPER_ADMIN = 'rotulahiri@gmail.com';
     const MAX_WORDS = 300;
     const MAX_COMMENT_WORDS = 15;
-    const FLOW_NAMES = { flow1: 'Flow One', flow2: 'Flow Two', flow3: 'Flow Three' };
-    const FLOW_COLORS = { flow1: '#3498db', flow2: '#e67e22', flow3: '#2ecc71' };
+    const FLOW_NAMES = { flow1:'Flow One', flow2:'Flow Two', flow3:'Flow Three' };
+    const FLOW_COLORS = { flow1:'#3498db', flow2:'#e67e22', flow3:'#2ecc71' };
 
     const client = new Appwrite.Client();
     client.setEndpoint(APPWRITE_ENDPOINT).setProject(PROJECT_ID);
@@ -188,64 +175,80 @@
     let currentStoryId = null;
     let currentStory = null;
     let currentFlowId = null;
-    let disclaimerAccepted = false;
 
-    // ========== DISCLAIMER ==========
-    function acceptDisclaimer() { disclaimerAccepted = true; document.getElementById('disclaimerOverlay').classList.add('hidden'); document.getElementById('disclaimerPopup').classList.add('hidden'); }
-    window.addEventListener('load', () => { disclaimerAccepted = false; document.getElementById('disclaimerOverlay').classList.remove('hidden'); document.getElementById('disclaimerPopup').classList.remove('hidden'); });
-    document.getElementById('disclaimerOverlay').addEventListener('click', acceptDisclaimer);
-    function requireDisclaimer() { if (!disclaimerAccepted) { alert('Please accept the disclaimer first.'); return false; } return true; }
-
-    window.togglePassword = function(inputId, btn) { const i = document.getElementById(inputId); i.type = i.type==='password'?'text':'password'; btn.textContent = i.type==='password'?'👁️':'🙈'; };
+    window.togglePassword = function(inputId, btn) { const i=document.getElementById(inputId); i.type=i.type==='password'?'text':'password'; btn.textContent=i.type==='password'?'👁️':'🙈'; };
 
     // ========== AUTH ==========
-    document.getElementById('showRegister').addEventListener('click', (e) => { e.preventDefault(); document.getElementById('loginForm').classList.add('hidden'); document.getElementById('registerForm').classList.remove('hidden'); });
-    document.getElementById('showLogin').addEventListener('click', (e) => { e.preventDefault(); document.getElementById('registerForm').classList.add('hidden'); document.getElementById('loginForm').classList.remove('hidden'); });
+    document.getElementById('showRegister').addEventListener('click', (e)=>{ e.preventDefault(); document.getElementById('loginForm').classList.add('hidden'); document.getElementById('registerForm').classList.remove('hidden'); });
+    document.getElementById('showLogin').addEventListener('click', (e)=>{ e.preventDefault(); document.getElementById('registerForm').classList.add('hidden'); document.getElementById('loginForm').classList.remove('hidden'); });
 
-    document.getElementById('libraryBtn').addEventListener('click', () => { if (!requireDisclaimer()) return; currentUser = { $id: 'guest-'+Date.now(), name: 'Reader', isGuest: true, role: 'reader' }; authScreen.classList.add('hidden'); appScreen.classList.remove('hidden'); document.getElementById('loggedInUser').textContent='📖 Reader (Guest)'; document.getElementById('navDashboard').classList.add('hidden'); goToLanding(); });
-    document.getElementById('googleLoginBtn').addEventListener('click', async () => { if (!requireDisclaimer()) return; try { currentUser = await googleLogin(); await setUserRole(); showApp(); } catch (err) { alert('Google login failed: '+err.message); } });
-    document.getElementById('loginBtn').addEventListener('click', async () => { if (!requireDisclaimer()) return; const e = document.getElementById('loginEmail').value, p = document.getElementById('loginPassword').value; if (!e||!p) { alert('Email and password required'); return; } try { await account.createEmailSession(e,p); currentUser = await account.get(); currentUser.isGuest=false; currentUser.loginMethod='email'; await setUserRole(); showApp(); } catch (err) { alert('Login failed: '+err.message); } });
-    document.getElementById('registerBtn').addEventListener('click', async () => { if (!requireDisclaimer()) return; const n = document.getElementById('regName').value||'Writer', e = document.getElementById('regEmail').value, p = document.getElementById('regPassword').value; if (p.length<8) { alert('Password min 8 chars'); return; } if (!e) { alert('Email required'); return; } try { await account.create(Appwrite.ID.unique(),e,p,n); await account.createEmailSession(e,p); currentUser = await account.get(); currentUser.isGuest=false; currentUser.loginMethod='email'; await setUserRole(); showApp(); } catch (err) { alert('Registration failed: '+err.message); } });
-    document.getElementById('logoutBtn').addEventListener('click', async () => { try { await account.deleteSession('current'); } catch(e){} currentUser=null; currentStoryId=null; currentStory=null; currentFlowId=null; appScreen.classList.add('hidden'); authScreen.classList.remove('hidden'); disclaimerAccepted=false; document.getElementById('disclaimerOverlay').classList.remove('hidden'); document.getElementById('disclaimerPopup').classList.remove('hidden'); });
+    document.getElementById('libraryBtn').addEventListener('click', ()=>{
+        currentUser = { $id:'guest-'+Date.now(), name:'Reader', isGuest:true, role:'reader' };
+        authScreen.classList.add('hidden'); appScreen.classList.remove('hidden');
+        document.getElementById('loggedInUser').textContent='📖 Reader (Guest)';
+        document.getElementById('navDashboard').classList.add('hidden'); goToLanding();
+    });
 
-    async function googleLogin() { await account.createOAuth2Session('google',window.location.href,window.location.href); const u = await account.get(); u.isGuest=false; u.loginMethod='google'; return u; }
+    async function googleLogin() { await account.createOAuth2Session('google',window.location.href,window.location.href); const u=await account.get(); u.isGuest=false; u.loginMethod='google'; return u; }
+
+    document.getElementById('googleLoginBtn').addEventListener('click', async ()=>{
+        try { currentUser = await googleLogin(); await setUserRole(); showApp(); } catch(err) { alert('Google login failed: '+err.message); }
+    });
+    document.getElementById('loginBtn').addEventListener('click', async ()=>{
+        const e=document.getElementById('loginEmail').value, p=document.getElementById('loginPassword').value;
+        if(!e||!p) { alert('Email and password required'); return; }
+        try { await account.createEmailSession(e,p); currentUser = await account.get(); currentUser.isGuest=false; currentUser.loginMethod='email'; await setUserRole(); showApp(); } catch(err) { alert('Login failed: '+err.message); }
+    });
+    document.getElementById('registerBtn').addEventListener('click', async ()=>{
+        const n=document.getElementById('regName').value||'Writer', e=document.getElementById('regEmail').value, p=document.getElementById('regPassword').value;
+        if(p.length<8) { alert('Password min 8 chars'); return; }
+        if(!e) { alert('Email required'); return; }
+        try { await account.create(Appwrite.ID.unique(),e,p,n); await account.createEmailSession(e,p); currentUser = await account.get(); currentUser.isGuest=false; currentUser.loginMethod='email'; await setUserRole(); showApp(); } catch(err) { alert('Registration failed: '+err.message); }
+    });
+    document.getElementById('logoutBtn').addEventListener('click', async ()=>{
+        try { await account.deleteSession('current'); } catch(e){}
+        currentUser=null; currentStoryId=null; currentStory=null; currentFlowId=null;
+        appScreen.classList.add('hidden'); authScreen.classList.remove('hidden');
+    });
 
     // ========== ROLES ==========
     async function setUserRole() {
-        currentUser.role='writer'; currentUser.canCreate=false; currentUser.canEdit=false; currentUser.canInvite=false; currentUser.canWrite=false; currentUser.isSuperAdmin=(currentUser.email===SUPER_ADMIN); currentUser.isCoAdmin=false;
-        if (currentUser.isSuperAdmin) { currentUser.role='admin'; currentUser.canCreate=true; currentUser.canEdit=true; currentUser.canInvite=true; currentUser.canWrite=true; return; }
-        try { const res = await databases.listDocuments(DATABASE_ID, STORIES_COLLECTION); if (res.documents.some(s=>s.coAdminId===currentUser.email)) { currentUser.role='coadmin'; currentUser.isCoAdmin=true; currentUser.canCreate=true; currentUser.canEdit=true; currentUser.canInvite=true; currentUser.canWrite=true; return; } } catch(e){}
-        if (currentUser.loginMethod==='google') {
-            try { const cr = await databases.listDocuments(DATABASE_ID, CREATORS_COLLECTION, [Appwrite.Query.equal('email',currentUser.email), Appwrite.Query.equal('status','active')]); if (cr.documents.length>0) { currentUser.role='creator'; currentUser.canCreate=true; currentUser.canEdit=true; currentUser.canInvite=true; currentUser.canWrite=true; return; }
-            const all = await databases.listDocuments(DATABASE_ID, CREATORS_COLLECTION); if (!all.documents.some(d=>d.email===currentUser.email)) { await databases.createDocument(DATABASE_ID, CREATORS_COLLECTION, Appwrite.ID.unique(), { email: currentUser.email, status:'active' }); } currentUser.role='creator'; currentUser.canCreate=true; currentUser.canEdit=true; currentUser.canInvite=true; currentUser.canWrite=true; return; } catch(e){ currentUser.canWrite=true; return; }
+        currentUser.role='writer'; currentUser.canCreate=false; currentUser.canEdit=false; currentUser.canInvite=false; currentUser.canWrite=false;
+        currentUser.isSuperAdmin=(currentUser.email===SUPER_ADMIN); currentUser.isCoAdmin=false;
+        if(currentUser.isSuperAdmin) { currentUser.role='admin'; currentUser.canCreate=true; currentUser.canEdit=true; currentUser.canInvite=true; currentUser.canWrite=true; return; }
+        try { const res=await databases.listDocuments(DATABASE_ID,STORIES_COLLECTION); if(res.documents.some(s=>s.coAdminId===currentUser.email)) { currentUser.role='coadmin'; currentUser.isCoAdmin=true; currentUser.canCreate=true; currentUser.canEdit=true; currentUser.canInvite=true; currentUser.canWrite=true; return; } } catch(e){}
+        if(currentUser.loginMethod==='google') {
+            try { const cr=await databases.listDocuments(DATABASE_ID,CREATORS_COLLECTION,[Appwrite.Query.equal('email',currentUser.email),Appwrite.Query.equal('status','active')]); if(cr.documents.length>0) { currentUser.role='creator'; currentUser.canCreate=true; currentUser.canEdit=true; currentUser.canInvite=true; currentUser.canWrite=true; return; }
+            const all=await databases.listDocuments(DATABASE_ID,CREATORS_COLLECTION); if(!all.documents.some(d=>d.email===currentUser.email)) { await databases.createDocument(DATABASE_ID,CREATORS_COLLECTION,Appwrite.ID.unique(),{email:currentUser.email,status:'active'}); } currentUser.role='creator'; currentUser.canCreate=true; currentUser.canEdit=true; currentUser.canInvite=true; currentUser.canWrite=true; return; } catch(e){ currentUser.canWrite=true; return; }
         }
-        try { const cr = await databases.listDocuments(DATABASE_ID, CREATORS_COLLECTION, [Appwrite.Query.equal('email',currentUser.email), Appwrite.Query.equal('status','active')]); if (cr.documents.length>0) { currentUser.role='creator'; currentUser.canCreate=true; currentUser.canEdit=true; currentUser.canInvite=true; currentUser.canWrite=true; return; } } catch(e){}
-        try { const inv = await databases.listDocuments(DATABASE_ID, INVITATIONS_COLLECTION, [Appwrite.Query.equal('email',currentUser.email), Appwrite.Query.equal('status','accepted')]); if (inv.documents.length>0) { currentUser.canWrite=true; } } catch(e){}
+        try { const cr=await databases.listDocuments(DATABASE_ID,CREATORS_COLLECTION,[Appwrite.Query.equal('email',currentUser.email),Appwrite.Query.equal('status','active')]); if(cr.documents.length>0) { currentUser.role='creator'; currentUser.canCreate=true; currentUser.canEdit=true; currentUser.canInvite=true; currentUser.canWrite=true; return; } } catch(e){}
+        try { const inv=await databases.listDocuments(DATABASE_ID,INVITATIONS_COLLECTION,[Appwrite.Query.equal('email',currentUser.email),Appwrite.Query.equal('status','accepted')]); if(inv.documents.length>0) { currentUser.canWrite=true; } } catch(e){}
     }
 
-    function getUserBadge() { if (!currentUser||currentUser.isGuest) return '📖 Reader (Guest)'; const n = currentUser.name||''; switch(currentUser.role) { case 'admin': return `👑 Admin ${n}`; case 'coadmin': return `🤝 Co-Admin ${n}`; case 'creator': return `✨ Creator ${n}`; case 'writer': return `✍️ Writer ${n}`; default: return `👤 ${n}`; } }
+    function getUserBadge() { if(!currentUser||currentUser.isGuest) return '📖 Reader (Guest)'; const n=currentUser.name||''; switch(currentUser.role) { case 'admin': return `👑 Admin ${n}`; case 'coadmin': return `🤝 Co-Admin ${n}`; case 'creator': return `✨ Creator ${n}`; case 'writer': return `✍️ Writer ${n}`; default: return `👤 ${n}`; } }
 
     // ========== NAVIGATION ==========
     document.getElementById('navHome').addEventListener('click', goToLanding);
     document.getElementById('navDashboard').addEventListener('click', goToDashboard);
-    function showApp() { authScreen.classList.add('hidden'); appScreen.classList.remove('hidden'); document.getElementById('loggedInUser').textContent = getUserBadge(); if (!currentUser.isGuest && currentUser.role!=='writer') document.getElementById('navDashboard').classList.remove('hidden'); else document.getElementById('navDashboard').classList.add('hidden'); goToLanding(); }
+
+    function showApp() { authScreen.classList.add('hidden'); appScreen.classList.remove('hidden'); document.getElementById('loggedInUser').textContent=getUserBadge(); if(!currentUser.isGuest&&currentUser.role!=='writer') document.getElementById('navDashboard').classList.remove('hidden'); else document.getElementById('navDashboard').classList.add('hidden'); goToLanding(); }
     function showView(view) { ['landingView','storyView','writerDesk','creatorDashboard'].forEach(id=>document.getElementById(id).classList.add('hidden')); const m={landing:'landingView',story:'storyView',writer:'writerDesk',dashboard:'creatorDashboard'}; if(m[view]) document.getElementById(m[view]).classList.remove('hidden'); document.getElementById('navHome').classList.toggle('active',view!=='dashboard'); document.getElementById('navDashboard').classList.toggle('active',view==='dashboard'); }
     function goToLanding() { currentFlowId=null; showView('landing'); loadStories(); loadTotalVisits(); }
     window.goToStory = async function(storyId) { currentStoryId=storyId; currentFlowId=null; showView('story'); await recordVisit(storyId); loadStoryView(); };
     function goToWriterDesk(flowId) { currentFlowId=flowId||null; showView('writer'); loadWriterDesk(); }
-    function goToDashboard() { if (currentUser&&!currentUser.isGuest&&currentUser.role!=='writer') { showView('dashboard'); loadCreatorDashboard(); } else { alert('Dashboard is for Admins, Co-Admins, and Creators only.'); } }
+    function goToDashboard() { if(currentUser&&!currentUser.isGuest&&currentUser.role!=='writer') { showView('dashboard'); loadCreatorDashboard(); } else { alert('Dashboard is for Admins, Co-Admins, and Creators only.'); } }
 
     // ========== VISITS ==========
-    async function recordVisit(sid) { try { await databases.createDocument(DATABASE_ID, VISITS_COLLECTION, Appwrite.ID.unique(), { storyId:sid, visitorId:currentUser?currentUser.email||currentUser.$id:'anon', visitedAt:new Date().toISOString() }); } catch(e){} }
-    async function loadTotalVisits() { try { const r = await databases.listDocuments(DATABASE_ID, VISITS_COLLECTION); document.getElementById('totalVisits').textContent='📊 '+(r.total||r.documents.length)+' visits'; } catch(e) { document.getElementById('totalVisits').textContent='📊 0 visits'; } }
+    async function recordVisit(sid) { try { await databases.createDocument(DATABASE_ID,VISITS_COLLECTION,Appwrite.ID.unique(),{storyId:sid,visitorId:currentUser?currentUser.email||currentUser.$id:'anon',visitedAt:new Date().toISOString()}); } catch(e){} }
+    async function loadTotalVisits() { try { const r=await databases.listDocuments(DATABASE_ID,VISITS_COLLECTION); document.getElementById('totalVisits').textContent='📊 '+(r.total||r.documents.length)+' visits'; } catch(e) { document.getElementById('totalVisits').textContent='📊 0 visits'; } }
 
     // ========== WRITE REQUEST ==========
-    document.getElementById('writeRequestBtn').addEventListener('click', async () => { const e = document.getElementById('writeRequestEmail').value.trim(); if (!e) { alert('Enter email'); return; } try { await databases.createDocument(DATABASE_ID, WRITE_REQUESTS_COLLECTION, Appwrite.ID.unique(), { email:e, message:'Requests write access', createdAt:new Date().toISOString() }); document.getElementById('writeRequestEmail').value=''; alert('Request sent!'); } catch(err) { alert('Error: '+err.message); } });
+    document.getElementById('writeRequestBtn').addEventListener('click', async ()=>{ const e=document.getElementById('writeRequestEmail').value.trim(); if(!e) { alert('Enter email'); return; } try { await databases.createDocument(DATABASE_ID,WRITE_REQUESTS_COLLECTION,Appwrite.ID.unique(),{email:e,message:'Requests write access',createdAt:new Date().toISOString()}); document.getElementById('writeRequestEmail').value=''; alert('Request sent!'); } catch(err) { alert('Error: '+err.message); } });
 
     // ========== LANDING ==========
-    async function loadStories() { const l = document.getElementById('storiesList'); l.innerHTML='Loading...'; try { const r = await databases.listDocuments(DATABASE_ID, STORIES_COLLECTION); if (r.documents.length===0) { l.innerHTML='<p style="grid-column:1/-1;text-align:center;padding:2rem;">No stories yet.</p>'; return; } l.innerHTML = r.documents.map(s=>{ const sc=s.status==='completed'?'status-completed':'status-active', st=s.status==='completed'?'✓ Completed':'✍️ In Progress'; const cd=s.completedAt?new Date(s.completedAt).toLocaleDateString():''; const wr=s.writers?s.writers.split(',').map(w=>w.trim()).filter(w=>w):[s.creatorName]; const dw=wr.slice(0,2).join(', '), mw=wr.length>2?` +${wr.length-2} more`:''; const branch = s.isBranching==='true' ? ' 🌳' : ''; return `<div class="card" onclick="goToStory('${s.$id}')" style="cursor:pointer;" oncontextmenu="event.preventDefault();showStoryPopup('${s.$id}');return false;"><h3>${s.title}${branch}</h3><p style="font-size:0.85rem;color:#7f8c8d;">${s.description||''}</p><div style="margin-top:0.5rem;"><span class="badge ${sc}">${st}</span>${cd?`<span class="badge">📅 ${cd}</span>`:''}</div><div style="margin-top:0.3rem;font-size:0.8rem;color:#555;">👥 ${dw}${mw}</div></div>`; }).join(''); } catch(err) { l.innerHTML='<p>Error loading stories.</p>'; } }
+    async function loadStories() { const l=document.getElementById('storiesList'); l.innerHTML='Loading...'; try { const r=await databases.listDocuments(DATABASE_ID,STORIES_COLLECTION); if(r.documents.length===0) { l.innerHTML='<p style="grid-column:1/-1;text-align:center;padding:2rem;">No stories yet.</p>'; return; } l.innerHTML=r.documents.map(s=>{ const sc=s.status==='completed'?'status-completed':'status-active', st=s.status==='completed'?'✓ Completed':'✍️ In Progress'; const cd=s.completedAt?new Date(s.completedAt).toLocaleDateString():''; const wr=s.writers?s.writers.split(',').map(w=>w.trim()).filter(w=>w):[s.creatorName]; const dw=wr.slice(0,2).join(', '), mw=wr.length>2?` +${wr.length-2} more`:''; const branch=s.isBranching==='true'?' 🌳':''; return `<div class="card" onclick="goToStory('${s.$id}')" style="cursor:pointer;" oncontextmenu="event.preventDefault();showStoryPopup('${s.$id}');return false;"><h3>${s.title}${branch}</h3><p style="font-size:0.85rem;color:#7f8c8d;">${s.description||''}</p><div style="margin-top:0.5rem;"><span class="badge ${sc}">${st}</span>${cd?`<span class="badge">📅 ${cd}</span>`:''}</div><div style="margin-top:0.3rem;font-size:0.8rem;color:#555;">👥 ${dw}${mw}</div></div>`; }).join(''); } catch(err) { l.innerHTML='<p>Error loading stories.</p>'; } }
 
-    window.showStoryPopup = async function(sid) { try { const s = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, sid); const ch = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, [Appwrite.Query.equal('storyId',sid), Appwrite.Query.orderAsc('chapterNumber')]); const wo=[...new Set(ch.documents.map(c=>c.authorName))]; document.getElementById('popupContent').innerHTML=`<h3>${s.title}</h3><p><strong>Status:</strong> ${s.status}</p><p><strong>Genre:</strong> ${s.genre||'Not specified'}</p><p><strong>Writers (order):</strong></p><ol>${wo.map(w=>'<li>'+w+'</li>').join('')}</ol>${s.completedAt?'<p><strong>Completed:</strong> '+new Date(s.completedAt).toLocaleDateString()+'</p>':''}<button onclick="closePopup()" style="margin-top:1rem;">Close</button>`; document.getElementById('popupOverlay').classList.remove('hidden'); document.getElementById('popupContent').classList.remove('hidden'); } catch(e) { alert('Error'); } };
+    window.showStoryPopup = async function(sid) { try { const s=await databases.getDocument(DATABASE_ID,STORIES_COLLECTION,sid); const ch=await databases.listDocuments(DATABASE_ID,CHAPTERS_COLLECTION,[Appwrite.Query.equal('storyId',sid),Appwrite.Query.orderAsc('chapterNumber')]); const wo=[...new Set(ch.documents.map(c=>c.authorName))]; document.getElementById('popupContent').innerHTML=`<h3>${s.title}</h3><p><strong>Status:</strong> ${s.status}</p><p><strong>Genre:</strong> ${s.genre||'Not specified'}</p><p><strong>Writers (order):</strong></p><ol>${wo.map(w=>'<li>'+w+'</li>').join('')}</ol>${s.completedAt?'<p><strong>Completed:</strong> '+new Date(s.completedAt).toLocaleDateString()+'</p>':''}<button onclick="closePopup()" style="margin-top:1rem;">Close</button>`; document.getElementById('popupOverlay').classList.remove('hidden'); document.getElementById('popupContent').classList.remove('hidden'); } catch(e) { alert('Error'); } };
     window.closePopup = function() { document.getElementById('popupOverlay').classList.add('hidden'); document.getElementById('popupContent').classList.add('hidden'); };
     document.getElementById('popupOverlay').addEventListener('click', window.closePopup);
 
@@ -255,148 +258,115 @@
 
     async function loadReadMode(flowId) {
         try {
-            const s = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId);
-            const queries = [Appwrite.Query.equal('storyId', currentStoryId), Appwrite.Query.orderAsc('chapterNumber')];
-            if (flowId) queries.push(Appwrite.Query.equal('flowId', flowId));
-            const ch = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, queries);
-            const sessions = ch.documents;
-            let html = `<div class="book-view"><h2>${s.title}${flowId?' — '+FLOW_NAMES[flowId]:''}</h2><p style="text-align:center;color:#7f8c8d;margin-bottom:2rem;">By ${s.writers||s.creatorName}</p>`;
-            if (sessions.length===0) html += '<p style="text-align:center;">No sessions yet.</p>';
-            else sessions.forEach(c => { html += `<div class="session"><p class="session-author">Session ${c.chapterNumber} — ${c.authorName}${c.flowId?' <span class="badge badge-'+c.flowId+'">'+FLOW_NAMES[c.flowId]+'</span>':''}</p><p style="white-space:pre-wrap;">${c.content}</p></div>`; });
-            html += `<button onclick="closeReadMode()" style="margin-top:1.5rem;">Close Read Mode</button>`;
-            if (s.isBranching==='true' && !flowId) {
-                html += '<div style="margin-top:1rem;text-align:center;"><p><strong>Choose a flow to read:</strong></p>';
-                ['flow1','flow2','flow3'].forEach(f => { html += `<button onclick="loadReadMode('${f}')" class="small" style="background:${FLOW_COLORS[f]};margin:0.3rem;color:white;">📖 ${FLOW_NAMES[f]}</button>`; });
-                html += '</div>';
-            }
-            html += '</div>';
-            document.getElementById('chaptersContainer').innerHTML = html;
-            document.getElementById('storyActionArea').classList.add('hidden'); document.getElementById('inviteSection').classList.add('hidden');
-            document.getElementById('branchingArea').classList.add('hidden');
+            const s=await databases.getDocument(DATABASE_ID,STORIES_COLLECTION,currentStoryId);
+            const ch=await databases.listDocuments(DATABASE_ID,CHAPTERS_COLLECTION,[Appwrite.Query.equal('storyId',currentStoryId),Appwrite.Query.orderAsc('chapterNumber')]);
+            let html=`<div class="book-view"><h2>${s.title}${flowId?' — '+FLOW_NAMES[flowId]:''}</h2><p style="text-align:center;color:#7f8c8d;margin-bottom:2rem;">By ${s.writers||s.creatorName}</p>`;
+            const sessions=ch.documents.filter(c=>!flowId?!c.flowId:c.flowId===flowId);
+            if(sessions.length===0) html+='<p style="text-align:center;">No sessions yet.</p>';
+            else sessions.forEach(c=>{ html+=`<div class="session"><p class="session-author">Session ${c.chapterNumber} — ${c.authorName}${c.flowId?` <span class="badge badge-${c.flowId}">${FLOW_NAMES[c.flowId]}</span>`:''}</p><p style="white-space:pre-wrap;">${c.content}</p></div>`; });
+            html+=`<button onclick="closeReadMode()" style="margin-top:1.5rem;">Close Read Mode</button>`;
+            if(s.isBranching==='true'&&!flowId) { html+='<div style="margin-top:1rem;"><p><strong>Choose a flow:</strong></p>'; ['flow1','flow2','flow3'].forEach(f=>{ html+=`<button onclick="loadReadMode('${f}')" class="small" style="background:${FLOW_COLORS[f]};margin:0.3rem;">📖 ${FLOW_NAMES[f]}</button>`; }); html+='</div>'; }
+            html+='</div>';
+            document.getElementById('chaptersContainer').innerHTML=html;
+            document.getElementById('storyActionArea').classList.add('hidden'); document.getElementById('inviteSection').classList.add('hidden'); document.getElementById('branchingArea').classList.add('hidden');
             document.getElementById('readModeBtn').classList.add('hidden'); document.getElementById('backToIndexBtn').classList.add('hidden');
-        } catch(err) { alert('Error loading read mode.'); }
+        } catch(err) { alert('Error'); }
     }
     window.closeReadMode = function() { document.getElementById('backToIndexBtn').classList.remove('hidden'); document.getElementById('readModeBtn').classList.remove('hidden'); document.getElementById('storyActionArea').classList.remove('hidden'); loadStoryView(); };
 
     async function loadStoryView() {
         document.getElementById('chaptersContainer').innerHTML='Loading...'; document.getElementById('storyActionArea').innerHTML=''; document.getElementById('branchingArea').classList.add('hidden');
         try {
-            currentStory = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId);
+            currentStory = await databases.getDocument(DATABASE_ID,STORIES_COLLECTION,currentStoryId);
             const isCompleted = currentStory.status==='completed';
             const isGuest = currentUser&&currentUser.isGuest;
             const canManage = currentUser&&!isGuest&&(currentUser.isSuperAdmin||currentUser.isCoAdmin||currentUser.$id===currentStory.creatorId);
             const canWrite = !isCompleted&&currentUser&&!isGuest&&currentUser.canWrite;
-            const isBranching = currentStory.isBranching==='true';
+            const isBranching = (currentStory.isBranching==='true'||currentStory.isBranching===true);
+            const allChapters = await databases.listDocuments(DATABASE_ID,CHAPTERS_COLLECTION,[Appwrite.Query.equal('storyId',currentStoryId)]);
+            const totalChapters = allChapters.documents.length;
 
-            const chaptersRes = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, [Appwrite.Query.equal('storyId',currentStoryId)]);
-            const totalChapters = chaptersRes.documents.length;
-            const mainChapters = chaptersRes.documents.filter(c => !c.flowId || c.flowId === '');
-            const mainCount = mainChapters.length;
-
-            // Likes & comments
             let likeCount=0, userLiked=false;
-            try { const lr=await databases.listDocuments(DATABASE_ID, LIKES_COLLECTION, [Appwrite.Query.equal('storyId',currentStoryId)]); likeCount=lr.total||lr.documents.length; if(currentUser&&!isGuest) userLiked=lr.documents.some(l=>l.userId===currentUser.$id); } catch(e){}
+            try { const lr=await databases.listDocuments(DATABASE_ID,LIKES_COLLECTION,[Appwrite.Query.equal('storyId',currentStoryId)]); likeCount=lr.total||lr.documents.length; if(currentUser&&!isGuest) userLiked=lr.documents.some(l=>l.userId===currentUser.$id); } catch(e){}
             let commentsHtml='';
-            try { const cr=await databases.listDocuments(DATABASE_ID, COMMENTS_COLLECTION, [Appwrite.Query.equal('storyId',currentStoryId), Appwrite.Query.orderDesc('$createdAt')]); if(cr.documents.length>0) commentsHtml=`<div class="comment-section"><strong>Comments (${cr.documents.length}):</strong><br>${cr.documents.map(c=>`<span class="comment-bubble"><strong>${c.userName}:</strong> ${c.content||''}</span>`).join(' ')}</div>`; } catch(e){}
+            try { const cr=await databases.listDocuments(DATABASE_ID,COMMENTS_COLLECTION,[Appwrite.Query.equal('storyId',currentStoryId),Appwrite.Query.orderDesc('$createdAt')]); if(cr.documents.length>0) commentsHtml=`<div class="comment-section"><strong>Comments (${cr.documents.length}):</strong><br>${cr.documents.map(c=>`<span class="comment-bubble"><strong>${c.userName}:</strong> ${c.content||''}</span>`).join(' ')}</div>`; } catch(e){}
 
             document.getElementById('storyHeader').innerHTML = `<div class="flex-between"><div><h2>${currentStory.title} ${isCompleted?'🏁':''} ${isBranching?'🌳':''}</h2><p style="color:#7f8c8d;">${currentStory.genre?'Genre: '+currentStory.genre:''}</p><p>Created by: <span class="badge">${currentStory.creatorName}</span></p><p>Status: <span class="badge ${isCompleted?'status-completed':'status-active'}">${isCompleted?'Completed':'In Progress'}</span></p></div><div style="text-align:right;"><button class="heart-btn ${userLiked?'liked':''}" onclick="toggleLike('${currentStoryId}')">${userLiked?'❤️':'🤍'} <span id="likeCount">${likeCount}</span></button>${!isGuest?`<div class="comment-input-row"><input type="text" id="quickComment" placeholder="Add comment..."><button class="small success" onclick="submitComment('${currentStoryId}')">💬</button></div>`:''}</div></div>${commentsHtml}`;
 
-            // === BRANCHING LOGIC (FIXED) ===
-            if (mainCount === 1 && !isBranching && canManage && !isCompleted) {
+            // BRANCHING LOGIC
+            if(totalChapters===1&&!isBranching&&canManage&&!isCompleted) {
                 document.getElementById('branchingArea').classList.remove('hidden');
-                document.getElementById('branchingArea').innerHTML = `<div class="card" style="border:3px dashed #5b6fe6; text-align:center;">
-                    <h3>🌳 Branch This Story!</h3><p>After the first session, create three separate flows for the story to continue. Assign three different writers — one for each flow.</p>
-                    <button onclick="branchStory('${currentStoryId}')" class="success" style="margin-top:0.5rem;">🌳 Create Flow One, Flow Two & Flow Three</button></div>`;
-            } else if (isBranching) {
+                document.getElementById('branchingArea').innerHTML = `<div class="card" style="border:3px dashed #5b6fe6;text-align:center;"><h3>🌳 Branch This Story!</h3><p>Create three separate flows for Session 2.</p><button onclick="branchStory('${currentStoryId}')" class="success" style="margin-top:0.5rem;">🌳 Create Three Flows</button></div>`;
+            }
+            if(isBranching) {
                 document.getElementById('branchingArea').classList.remove('hidden');
-                let flowHtml = '<div class="flow-tabs">';
-                ['flow1','flow2','flow3'].forEach(f => {
-                    flowHtml += `<button class="flow-tab ${f} ${currentFlowId===f?'active':''}" onclick="switchFlow('${f}')">${FLOW_NAMES[f]}</button>`;
-                });
-                flowHtml += `<button class="flow-tab" style="background:#f0f0f0;" onclick="switchFlow(null)">📖 Main Story</button>`;
-                flowHtml += '</div><div id="flowContent" style="margin-top:0.5rem;"></div>';
-                document.getElementById('branchingArea').innerHTML = flowHtml;
-                if (currentFlowId) await loadFlowContent(currentFlowId);
+                let fh='<div class="flow-tabs">';
+                ['flow1','flow2','flow3'].forEach(f=>{ fh+=`<button class="flow-tab ${f} ${currentFlowId===f?'active':''}" onclick="switchFlow('${f}')">${FLOW_NAMES[f]}</button>`; });
+                fh+='</div><div id="flowContent"></div>';
+                document.getElementById('branchingArea').innerHTML=fh;
+                if(currentFlowId) await loadFlowContent(currentFlowId);
             }
 
-            // Action area
             let actionHtml='';
-            if (!isGuest) {
-                if (isCompleted) actionHtml='<p style="color:#7f8c8d;margin:1rem 0;">📖 Story completed.</p>';
-                else if (canWrite && (!isBranching || currentFlowId)) actionHtml=`<button id="contributeBtn" class="success">✍️ Write ${currentFlowId?'in '+FLOW_NAMES[currentFlowId]:'Now!'}</button>`;
-                else if (canWrite && isBranching && !currentFlowId) actionHtml='<p style="margin:1rem 0;">👆 Select a flow above to write.</p>';
+            if(!isGuest) {
+                if(isCompleted) actionHtml='<p style="color:#7f8c8d;margin:1rem 0;">📖 Story completed.</p>';
+                else if(canWrite&&(!isBranching||currentFlowId)) actionHtml=`<button id="contributeBtn" class="success">✍️ Write ${currentFlowId?'in '+FLOW_NAMES[currentFlowId]:'Now!'}</button>`;
+                else if(canWrite&&isBranching&&!currentFlowId) actionHtml='<p style="margin:1rem 0;">👆 Select a flow above to write.</p>';
                 else actionHtml='<button id="waitingBtn" disabled>⏳ Waiting for Your Turn</button><button id="passwordEntryBtn" class="outline small">🔑 Enter Password</button>';
             }
             document.getElementById('storyActionArea').innerHTML=actionHtml;
             setTimeout(()=>{ const cb=document.getElementById('contributeBtn'); if(cb) cb.addEventListener('click',()=>goToWriterDesk(currentFlowId)); const pb=document.getElementById('passwordEntryBtn'); if(pb) pb.addEventListener('click',handlePasswordEntry); },100);
 
             const invSec=document.getElementById('inviteSection');
-            if (canManage&&!isCompleted) { invSec.classList.remove('hidden'); loadInvites(); } else { invSec.classList.add('hidden'); }
+            if(canManage&&!isCompleted) { invSec.classList.remove('hidden'); loadInvites(); } else { invSec.classList.add('hidden'); }
 
-            // Show chapters
-            const q = [Appwrite.Query.equal('storyId',currentStoryId), Appwrite.Query.orderAsc('chapterNumber')];
-            if (currentFlowId) q.push(Appwrite.Query.equal('flowId',currentFlowId));
-            else if (!isBranching) { /* show all for non-branched */ }
-            const ch=await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, q);
-            const chapters=ch.documents.filter(c=>!currentFlowId?true:c.flowId===currentFlowId);
-            document.getElementById('chaptersContainer').innerHTML = chapters.length===0?`<p>No sessions ${currentFlowId?'in this flow ':''}yet.</p>`:chapters.map(c=>`<div class="card"><div class="flex-between"><h4>Session ${c.chapterNumber} — by <span class="badge writer">${c.authorName}</span>${c.flowId?` <span class="badge badge-${c.flowId}">${FLOW_NAMES[c.flowId]}</span>`:''}</h4>${canManage?`<button class="small outline" onclick="editSessionFullscreen('${c.$id}','${currentStoryId}')">✏️ Edit</button>`:''}</div><p style="white-space:pre-wrap">${c.content}</p><small>${new Date(c.$createdAt).toLocaleString()}</small></div>`).join('');
-        } catch(err) { document.getElementById('chaptersContainer').innerHTML='<p>Error.</p>'; }
+            const q=[Appwrite.Query.equal('storyId',currentStoryId),Appwrite.Query.orderAsc('chapterNumber')];
+            if(currentFlowId) q.push(Appwrite.Query.equal('flowId',currentFlowId));
+            else if(!isBranching) q.push(Appwrite.Query.isNull('flowId'));
+            const ch=await databases.listDocuments(DATABASE_ID,CHAPTERS_COLLECTION,q);
+            const chapters=ch.documents.filter(c=>!currentFlowId?(!c.flowId||c.flowId===''):c.flowId===currentFlowId);
+            document.getElementById('chaptersContainer').innerHTML=chapters.length===0?`<p>No sessions ${currentFlowId?'in this flow ':''}yet.</p>`:chapters.map(c=>`<div class="card"><div class="flex-between"><h4>Session ${c.chapterNumber} — by <span class="badge writer">${c.authorName}</span>${c.flowId?` <span class="badge badge-${c.flowId}">${FLOW_NAMES[c.flowId]}</span>`:''}</h4>${canManage?`<button class="small outline" onclick="editSessionFullscreen('${c.$id}','${currentStoryId}')">✏️ Edit</button>`:''}</div><p style="white-space:pre-wrap">${c.content}</p><small>${new Date(c.$createdAt).toLocaleString()}</small></div>`).join('');
+        } catch(err) { document.getElementById('chaptersContainer').innerHTML='<p>Error: '+err.message+'</p>'; console.error(err); }
     }
 
-    // ========== BRANCHING FUNCTIONS ==========
     window.branchStory = async function(storyId) {
-        if (!confirm('Create three separate flows for Session 2? This cannot be undone.')) return;
+        if(!confirm('Create three separate flows? This cannot be undone.')) return;
         try {
-            await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, storyId, { isBranching:'true', branchingStage:'active' });
-            for (const f of ['flow1','flow2','flow3']) {
-                try { await databases.createDocument(DATABASE_ID, FLOW_TURNS_COLLECTION, Appwrite.ID.unique(), { storyId, flowId:f, currentWriterId:'', status:'active' }); } catch(e){}
+            await databases.updateDocument(DATABASE_ID,STORIES_COLLECTION,storyId,{isBranching:'true',branchingStage:'active'});
+            for(const f of ['flow1','flow2','flow3']) {
+                try { await databases.createDocument(DATABASE_ID,FLOW_TURNS_COLLECTION,Appwrite.ID.unique(),{storyId,flowId:f,currentWriterId:'',status:'active'}); } catch(e){}
             }
-            alert('Story branched! Three flows created. Assign writers to each flow from the story page.');
-            currentStory = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, storyId);
-            currentFlowId = 'flow1';
-            loadStoryView();
+            alert('Story branched! Three flows created.');
+            currentStory = await databases.getDocument(DATABASE_ID,STORIES_COLLECTION,storyId);
+            currentFlowId='flow1'; loadStoryView();
         } catch(err) { alert('Error: '+err.message); }
     };
 
-    window.switchFlow = function(flowId) {
-        currentFlowId = flowId;
-        loadStoryView();
-    };
+    window.switchFlow = function(flowId) { currentFlowId=flowId; loadStoryView(); };
 
     async function loadFlowContent(flowId) {
         try {
-            const ftRes = await databases.listDocuments(DATABASE_ID, FLOW_TURNS_COLLECTION, [Appwrite.Query.equal('storyId',currentStoryId), Appwrite.Query.equal('flowId',flowId)]);
-            const ft = ftRes.documents.length>0 ? ftRes.documents[0] : null;
-            const fc = document.getElementById('flowContent');
-            if (fc) {
-                fc.innerHTML = `<div class="branch-card ${flowId}"><h4>${FLOW_NAMES[flowId]}</h4>
-                    <p>Status: ${ft?ft.status:'active'} | Writer: ${ft&&ft.currentWriterId?ft.currentWriterId:'Unassigned'}</p>
-                    ${currentUser&&(currentUser.isSuperAdmin||currentUser.isCoAdmin||currentUser.$id===currentStory.creatorId)?`<button onclick="assignFlowTurn('${flowId}')" class="small">🎯 Assign Writer</button>`:''}
-                </div>`;
-            }
-        } catch(e) {}
+            const ftRes=await databases.listDocuments(DATABASE_ID,FLOW_TURNS_COLLECTION,[Appwrite.Query.equal('storyId',currentStoryId),Appwrite.Query.equal('flowId',flowId)]);
+            const ft=ftRes.documents.length>0?ftRes.documents[0]:null;
+            const fc=document.getElementById('flowContent');
+            if(fc) { fc.innerHTML=`<div class="branch-card ${flowId}"><h4>${FLOW_NAMES[flowId]}</h4><p>Status: ${ft?ft.status:'active'} | Writer: ${ft&&ft.currentWriterId?ft.currentWriterId:'Unassigned'}</p>${currentUser&&(currentUser.isSuperAdmin||currentUser.isCoAdmin||currentUser.$id===currentStory.creatorId)?`<button onclick="assignFlowTurn('${flowId}')" class="small">🎯 Assign Turn</button>`:''}</div>`; }
+        } catch(e) { /* flowTurns might not exist yet */ }
     }
 
     window.assignFlowTurn = function(flowId) {
-        const email = prompt(`Assign writer for ${FLOW_NAMES[flowId]} (enter email):`);
-        if (!email) return;
-        (async () => {
-            try {
-                const ftRes = await databases.listDocuments(DATABASE_ID, FLOW_TURNS_COLLECTION, [Appwrite.Query.equal('storyId',currentStoryId), Appwrite.Query.equal('flowId',flowId)]);
-                if (ftRes.documents.length>0) {
-                    await databases.updateDocument(DATABASE_ID, FLOW_TURNS_COLLECTION, ftRes.documents[0].$id, { currentWriterId:email, status:'active' });
-                } else {
-                    await databases.createDocument(DATABASE_ID, FLOW_TURNS_COLLECTION, Appwrite.ID.unique(), { storyId:currentStoryId, flowId, currentWriterId:email, status:'active' });
-                }
-                alert(`${FLOW_NAMES[flowId]} assigned to ${email}!`);
-                loadFlowContent(flowId);
-            } catch(err) { alert('Error: '+err.message); }
-        })();
+        const email=prompt(`Assign writer for ${FLOW_NAMES[flowId]} (enter email):`);
+        if(!email) return;
+        (async()=>{ try {
+            const ftRes=await databases.listDocuments(DATABASE_ID,FLOW_TURNS_COLLECTION,[Appwrite.Query.equal('storyId',currentStoryId),Appwrite.Query.equal('flowId',flowId)]);
+            if(ftRes.documents.length>0) await databases.updateDocument(DATABASE_ID,FLOW_TURNS_COLLECTION,ftRes.documents[0].$id,{currentWriterId:email,status:'active'});
+            else await databases.createDocument(DATABASE_ID,FLOW_TURNS_COLLECTION,Appwrite.ID.unique(),{storyId:currentStoryId,flowId,currentWriterId:email,status:'active'});
+            alert(`${FLOW_NAMES[flowId]} assigned to ${email}!`); loadFlowContent(flowId);
+        } catch(err) { alert('Error: '+err.message); }})();
     };
 
     async function handlePasswordEntry() {
-        const pw = prompt("Enter story access password:");
-        if (pw&&pw===currentStory.accessPassword) { await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId, { currentWriterId:currentUser.$id }); currentStory.currentWriterId=currentUser.$id; goToWriterDesk(currentFlowId); }
+        const pw=prompt("Enter story access password:");
+        if(pw&&pw===currentStory.accessPassword) { await databases.updateDocument(DATABASE_ID,STORIES_COLLECTION,currentStoryId,{currentWriterId:currentUser.$id}); currentStory.currentWriterId=currentUser.$id; goToWriterDesk(currentFlowId); }
         else { alert("Incorrect."); }
     }
 
@@ -415,27 +385,15 @@
 
     // ========== WRITER'S DESK ==========
     document.getElementById('backToStoryBtn').addEventListener('click', ()=>{ if(currentStoryId) { currentFlowId=null; window.goToStory(currentStoryId); } });
-    const chapterText = document.getElementById('chapterText');
+    const chapterText=document.getElementById('chapterText');
     chapterText.addEventListener('input', ()=>{ const w=chapterText.value.trim().split(/\s+/).filter(x=>x.length>0);document.getElementById('wordCountDisplay').textContent=w.length;const p=Math.min((w.length/MAX_WORDS)*100,100);document.getElementById('wordProgress').style.width=p+'%';document.getElementById('wordProgress').classList.toggle('over-limit',w.length>MAX_WORDS);document.getElementById('wordWarning').classList.toggle('hidden',w.length<=MAX_WORDS); });
     document.getElementById('saveDraftBtn').addEventListener('click', async ()=>{ const c=chapterText.value;document.getElementById('draftStatus').textContent='Saving...';try{const ex=await databases.listDocuments(DATABASE_ID,DRAFTS_COLLECTION,[Appwrite.Query.equal('storyId',currentStoryId),Appwrite.Query.equal('authorId',currentUser.$id)]);const wc=c.trim().split(/\s+/).filter(w=>w.length>0).length;if(ex.documents.length>0)await databases.updateDocument(DATABASE_ID,DRAFTS_COLLECTION,ex.documents[0].$id,{content:c,wordCount:wc,lastModified:new Date().toISOString()});else await databases.createDocument(DATABASE_ID,DRAFTS_COLLECTION,Appwrite.ID.unique(),{storyId:currentStoryId,authorId:currentUser.$id,content:c,wordCount:wc,lastModified:new Date().toISOString()});document.getElementById('draftStatus').textContent='Draft saved at '+new Date().toLocaleTimeString();}catch(err){document.getElementById('draftStatus').textContent='Error.';} });
     document.getElementById('submitChapterBtn').addEventListener('click', async ()=>{ if(!currentStoryId){alert('No story.');return;}if(currentStory.status==='completed'){alert('Completed.');return;}const c=chapterText.value.trim();if(!c){alert('Write something.');return;}const wc=c.split(/\s+/).filter(w=>w.length>0).length;if(wc>MAX_WORDS){alert(`Max ${MAX_WORDS} words.`);return;}try{const cr=await databases.listDocuments(DATABASE_ID,CHAPTERS_COLLECTION,[Appwrite.Query.equal('storyId',currentStoryId)]);const nn=cr.documents.length+1;await databases.createDocument(DATABASE_ID,CHAPTERS_COLLECTION,Appwrite.ID.unique(),{storyId:currentStoryId,chapterNumber:nn,content:c,authorId:currentUser.$id,authorName:currentUser.name||'Writer',wordCount:wc,status:'published',flowId:currentFlowId||'',parentId:''});if(currentFlowId){const ftRes=await databases.listDocuments(DATABASE_ID,FLOW_TURNS_COLLECTION,[Appwrite.Query.equal('storyId',currentStoryId),Appwrite.Query.equal('flowId',currentFlowId)]);if(ftRes.documents.length>0)await databases.updateDocument(DATABASE_ID,FLOW_TURNS_COLLECTION,ftRes.documents[0].$id,{currentWriterId:'',status:'active'});}else{await databases.updateDocument(DATABASE_ID,STORIES_COLLECTION,currentStoryId,{currentWriterId:'',writers:currentStory.writers?(currentStory.writers.split(',').includes(currentUser.name||'')?currentStory.writers:currentStory.writers+','+(currentUser.name||'Writer')):(currentStory.creatorName+','+(currentUser.name||'Writer'))});}chapterText.value='';document.getElementById('wordCountDisplay').textContent='0';document.getElementById('wordProgress').style.width='0%';document.getElementById('wordProgress').classList.remove('over-limit');document.getElementById('wordWarning').classList.add('hidden');document.getElementById('draftStatus').textContent='Session submitted! ✅';const dd=await databases.listDocuments(DATABASE_ID,DRAFTS_COLLECTION,[Appwrite.Query.equal('storyId',currentStoryId),Appwrite.Query.equal('authorId',currentUser.$id)]);if(dd.documents.length>0)await databases.deleteDocument(DATABASE_ID,DRAFTS_COLLECTION,dd.documents[0].$id);currentStory=await databases.getDocument(DATABASE_ID,STORIES_COLLECTION,currentStoryId);loadPreviousSessions();setTimeout(()=>{window.goToStory(currentStoryId);},1500);}catch(err){alert('Error: '+err.message);} });
-    async function loadWriterDesk() {
-        if (!currentStory) { try { currentStory = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId); } catch(e) { alert('Error'); goToLanding(); return; } }
-        if (currentStory.status==='completed') { alert('Completed.'); window.goToStory(currentStoryId); return; }
-        if (!currentUser.canWrite) { alert('No write permission.'); window.goToStory(currentStoryId); return; }
-        const canManage = currentUser&&(currentUser.isSuperAdmin||currentUser.isCoAdmin||currentUser.$id===currentStory.creatorId);
-        const hasTurn = currentUser&&currentUser.$id===currentStory.currentWriterId;
-        if (!hasTurn&&!canManage) { const pw=prompt("Enter password:"); if(pw&&pw===currentStory.accessPassword) { await databases.updateDocument(DATABASE_ID,STORIES_COLLECTION,currentStoryId,{currentWriterId:currentUser.$id}); currentStory.currentWriterId=currentUser.$id; } else { alert("Incorrect."); window.goToStory(currentStoryId); return; } }
-        document.getElementById('deskStoryTitle').textContent = currentStory.title;
-        const fb = document.getElementById('deskFlowBadge');
-        if (currentFlowId) { fb.classList.remove('hidden'); fb.textContent = FLOW_NAMES[currentFlowId]; fb.className = 'badge badge-'+currentFlowId; } else { fb.classList.add('hidden'); }
-        try { const drafts=await databases.listDocuments(DATABASE_ID,DRAFTS_COLLECTION,[Appwrite.Query.equal('storyId',currentStoryId),Appwrite.Query.equal('authorId',currentUser.$id)]); if(drafts.documents.length>0) { chapterText.value=drafts.documents[0].content; chapterText.dispatchEvent(new Event('input')); document.getElementById('draftStatus').textContent='Loaded draft from '+new Date(drafts.documents[0].lastModified).toLocaleString(); } else { chapterText.value=''; document.getElementById('draftStatus').textContent=''; } } catch(e) {}
-        loadPreviousSessions();
-    }
-    async function loadPreviousSessions() { const pl=document.getElementById('prevChaptersList'); const lc=document.getElementById('lastSessionCard'); pl.innerHTML='Loading...'; lc.classList.add('hidden'); try { const q=[Appwrite.Query.equal('storyId',currentStoryId), Appwrite.Query.orderDesc('chapterNumber'), Appwrite.Query.limit(5)]; if(currentFlowId) q.push(Appwrite.Query.equal('flowId',currentFlowId)); const res=await databases.listDocuments(DATABASE_ID,CHAPTERS_COLLECTION,q); if(res.documents.length===0) { pl.innerHTML='<p>No sessions yet.</p>'; return; } const last=res.documents[0]; lc.classList.remove('hidden'); lc.innerHTML=`<h4>Last Session (Session ${last.chapterNumber}) — by ${last.authorName}${last.flowId?` <span class="badge badge-${last.flowId}">${FLOW_NAMES[last.flowId]}</span>`:''}</h4><p style="white-space:pre-wrap;margin-top:0.5rem;">${last.content}</p><small>${new Date(last.$createdAt).toLocaleString()}</small>`; pl.innerHTML = res.documents.length>1?'<h4>Earlier Sessions:</h4>'+res.documents.slice(1).map(c=>`<div class="card" style="padding:0.8rem;font-size:0.85rem;"><strong>Session ${c.chapterNumber}</strong> — ${c.authorName}${c.flowId?` (${FLOW_NAMES[c.flowId]})`:''}: ${c.content.substring(0,80)}...</div>`).join('') : ''; } catch(err) { pl.innerHTML='<p>Error.</p>'; } }
+    async function loadWriterDesk() { if(!currentStory) { try { currentStory=await databases.getDocument(DATABASE_ID,STORIES_COLLECTION,currentStoryId); } catch(e) { alert('Error'); goToLanding(); return; } } if(currentStory.status==='completed') { alert('Completed.'); window.goToStory(currentStoryId); return; } if(!currentUser.canWrite) { alert('No write permission.'); window.goToStory(currentStoryId); return; } const canManage=currentUser&&(currentUser.isSuperAdmin||currentUser.isCoAdmin||currentUser.$id===currentStory.creatorId); const hasTurn=currentUser&&currentUser.$id===currentStory.currentWriterId; if(!hasTurn&&!canManage) { const pw=prompt("Enter password:"); if(pw&&pw===currentStory.accessPassword) { await databases.updateDocument(DATABASE_ID,STORIES_COLLECTION,currentStoryId,{currentWriterId:currentUser.$id}); currentStory.currentWriterId=currentUser.$id; } else { alert("Incorrect."); window.goToStory(currentStoryId); return; } } document.getElementById('deskStoryTitle').textContent=currentStory.title; const fb=document.getElementById('deskFlowBadge'); if(currentFlowId) { fb.classList.remove('hidden'); fb.textContent=FLOW_NAMES[currentFlowId]; fb.className='badge badge-'+currentFlowId; } else { fb.classList.add('hidden'); } try { const drafts=await databases.listDocuments(DATABASE_ID,DRAFTS_COLLECTION,[Appwrite.Query.equal('storyId',currentStoryId),Appwrite.Query.equal('authorId',currentUser.$id)]); if(drafts.documents.length>0) { chapterText.value=drafts.documents[0].content; chapterText.dispatchEvent(new Event('input')); document.getElementById('draftStatus').textContent='Loaded draft from '+new Date(drafts.documents[0].lastModified).toLocaleString(); } else { chapterText.value=''; document.getElementById('draftStatus').textContent=''; } } catch(e) {} loadPreviousSessions(); }
+    async function loadPreviousSessions() { const pl=document.getElementById('prevChaptersList');const lc=document.getElementById('lastSessionCard');pl.innerHTML='Loading...';lc.classList.add('hidden');try{const q=[Appwrite.Query.equal('storyId',currentStoryId),Appwrite.Query.orderDesc('chapterNumber'),Appwrite.Query.limit(5)];if(currentFlowId) q.push(Appwrite.Query.equal('flowId',currentFlowId));const res=await databases.listDocuments(DATABASE_ID,CHAPTERS_COLLECTION,q);if(res.documents.length===0) { pl.innerHTML='<p>No sessions yet.</p>';return; } const last=res.documents[0];lc.classList.remove('hidden');lc.innerHTML=`<h4>Last Session (Session ${last.chapterNumber}) — by ${last.authorName}${last.flowId?` <span class="badge badge-${last.flowId}">${FLOW_NAMES[last.flowId]}</span>`:''}</h4><p style="white-space:pre-wrap;margin-top:0.5rem;">${last.content}</p><small>${new Date(last.$createdAt).toLocaleString()}</small>`;pl.innerHTML=res.documents.length>1?'<h4>Earlier Sessions:</h4>'+res.documents.slice(1).map(c=>`<div class="card" style="padding:0.8rem;font-size:0.85rem;"><strong>Session ${c.chapterNumber}</strong> — ${c.authorName}${c.flowId?` (${FLOW_NAMES[c.flowId]})`:''}: ${c.content.substring(0,80)}...</div>`).join(''):''; } catch(err) { pl.innerHTML='<p>Error.</p>'; } }
 
     // ========== DASHBOARD ==========
-    async function loadCreatorDashboard() { const le=document.getElementById('creatorStoriesList'); if(!currentUser||currentUser.isGuest){le.innerHTML='<p>Please login.</p>';return;} if(currentUser.role==='writer'){le.innerHTML='<p>Dashboard is for Admins, Co-Admins, and Creators.</p>';return;} le.innerHTML='Loading...'; try{const[ms,ar]=await Promise.all([databases.listDocuments(DATABASE_ID,STORIES_COLLECTION,[Appwrite.Query.equal('creatorId',currentUser.$id)]),(currentUser.isSuperAdmin||currentUser.isCoAdmin)?databases.listDocuments(DATABASE_ID,STORIES_COLLECTION):Promise.resolve({documents:[]})]);const as=[...ms.documents];if(currentUser.isSuperAdmin||currentUser.isCoAdmin)ar.documents.forEach(s=>{if(!as.find(m=>m.$id===s.$id))as.push(s);});let h=`<div class="card" style="margin-bottom:1.5rem;border-left:4px solid #5b6fe6;grid-column:1/-1;"><h3>${getUserBadge()} Dashboard</h3>`;if(currentUser.canCreate)h+='<button onclick="createNewStory()" class="success">+ Create New Story</button> ';h+='<button onclick="dashboardInvite()" class="outline">📨 Grant Write Access</button> ';h+='<button onclick="viewWriteRequests()" class="small">📋 View Requests</button> ';if(currentUser.isSuperAdmin){h+='<button onclick="preApproveCreator()" class="outline small">➕ Pre-approve Creator</button> ';h+='<button onclick="setCoAdmin()" class="outline small">🤝 Set Co-Admin</button> ';h+='<button onclick="viewRecentLogins()" class="small">👥 Recent Logins</button> ';}h+='</div>';if(as.length===0)h+='<p style="grid-column:1/-1;">No stories yet.</p>';else h+=as.map(s=>{const io=s.creatorId===currentUser.$id;return`<div class="card"><div class="flex-between"><h3>${s.title} ${!io?'(Editor)':''} ${s.isBranching==='true'?'🌳':''}</h3><span class="badge ${s.status==='completed'?'status-completed':'status-active'}">${s.status==='completed'?'✓ Completed':'✍️ In Progress'}</span></div><p style="font-size:0.85rem;color:#7f8c8d;">Genre: ${s.genre||'None'} | Writers: ${s.writers||s.creatorName}</p><p style="font-size:0.8rem;">Password: <code>${s.accessPassword||'Not set'}</code> | Co-Admin: ${s.coAdminId||'None'}</p><div class="flex-row" style="margin-top:0.5rem;"><button onclick="goToStory('${s.$id}')" class="small">📖 View</button><button onclick="goToWriterDeskFromDashboard('${s.$id}')" class="small" ${s.status==='completed'?'disabled':''}>✍️ Write</button>${s.status!=='completed'?`<button onclick="completeStory('${s.$id}')" class="danger small">🏁 End</button>`:`<button disabled class="small">✓ ${new Date(s.completedAt).toLocaleDateString()}</button>`}<button onclick="editStoryDetails('${s.$id}')" class="outline small">✏️ Edit</button></div></div>`;}).join('');le.innerHTML=h;}catch(err){le.innerHTML='<p>Error: '+err.message+'</p>';} }
+    async function loadCreatorDashboard() { const le=document.getElementById('creatorStoriesList');if(!currentUser||currentUser.isGuest){le.innerHTML='<p>Please login.</p>';return;}if(currentUser.role==='writer'){le.innerHTML='<p>Dashboard is for Admins, Co-Admins, and Creators.</p>';return;}le.innerHTML='Loading...';try{const[ms,ar]=await Promise.all([databases.listDocuments(DATABASE_ID,STORIES_COLLECTION,[Appwrite.Query.equal('creatorId',currentUser.$id)]),(currentUser.isSuperAdmin||currentUser.isCoAdmin)?databases.listDocuments(DATABASE_ID,STORIES_COLLECTION):Promise.resolve({documents:[]})]);const as=[...ms.documents];if(currentUser.isSuperAdmin||currentUser.isCoAdmin)ar.documents.forEach(s=>{if(!as.find(m=>m.$id===s.$id))as.push(s);});let h=`<div class="card" style="margin-bottom:1.5rem;border-left:4px solid #5b6fe6;grid-column:1/-1;"><h3>${getUserBadge()} Dashboard</h3>`;if(currentUser.canCreate)h+='<button onclick="createNewStory()" class="success">+ Create New Story</button> ';h+='<button onclick="dashboardInvite()" class="outline">📨 Grant Write Access</button> ';h+='<button onclick="viewWriteRequests()" class="small">📋 View Requests</button> ';if(currentUser.isSuperAdmin){h+='<button onclick="preApproveCreator()" class="outline small">➕ Pre-approve Creator</button> ';h+='<button onclick="setCoAdmin()" class="outline small">🤝 Set Co-Admin</button> ';h+='<button onclick="viewRecentLogins()" class="small">👥 Recent Logins</button> ';}h+='</div>';if(as.length===0)h+='<p style="grid-column:1/-1;">No stories yet.</p>';else h+=as.map(s=>{const io=s.creatorId===currentUser.$id;return`<div class="card"><div class="flex-between"><h3>${s.title} ${!io?'(Editor)':''} ${s.isBranching==='true'?'🌳':''}</h3><span class="badge ${s.status==='completed'?'status-completed':'status-active'}">${s.status==='completed'?'✓ Completed':'✍️ In Progress'}</span></div><p style="font-size:0.85rem;color:#7f8c8d;">Genre: ${s.genre||'None'} | Writers: ${s.writers||s.creatorName}</p><p style="font-size:0.8rem;">Password: <code>${s.accessPassword||'Not set'}</code> | Co-Admin: ${s.coAdminId||'None'}</p><div class="flex-row" style="margin-top:0.5rem;"><button onclick="goToStory('${s.$id}')" class="small">📖 View</button><button onclick="goToWriterDeskFromDashboard('${s.$id}')" class="small" ${s.status==='completed'?'disabled':''}>✍️ Write</button>${s.status!=='completed'?`<button onclick="completeStory('${s.$id}')" class="danger small">🏁 End</button>`:`<button disabled class="small">✓ ${new Date(s.completedAt).toLocaleDateString()}</button>`}<button onclick="editStoryDetails('${s.$id}')" class="outline small">✏️ Edit</button></div></div>`;}).join('');le.innerHTML=h;}catch(err){le.innerHTML='<p>Error: '+err.message+'</p>';} }
     window.dashboardInvite = function() { const e=prompt("Gmail to grant write access:"); if(!e)return; (async()=>{try{await databases.createDocument(DATABASE_ID,CREATORS_COLLECTION,Appwrite.ID.unique(),{email:e,status:'active'});alert(`✅ Write access granted to ${e}!`);}catch(err){alert('Error: '+err.message);}})(); };
     window.createNewStory = function() { if(!currentUser||currentUser.isGuest){alert('Login first.');return;}if(!currentUser.canCreate){alert('Only Admins, Co-Admins, and Creators can create stories.');return;}const t=prompt("Story title:");if(!t)return;const g=prompt("Genre:")||'';const d=prompt("Description:")||'';const p=prompt("Set access password:")||'';(async()=>{try{await databases.createDocument(DATABASE_ID,STORIES_COLLECTION,Appwrite.ID.unique(),{title:t,genre:g,description:d,creatorId:currentUser.$id,creatorName:currentUser.name,editorId:'',coAdminId:'',status:'active',currentWriterId:currentUser.$id,lastWriterId:'',turnExpires:'',completedAt:'',accessPassword:p,writers:currentUser.name,admins:'',isBranching:'false',branchingStage:'none'});alert('Story created!');loadCreatorDashboard();loadStories();}catch(err){alert('Error: '+err.message);}})(); };
     window.preApproveCreator = function() { const e=prompt("Gmail to pre-approve:");if(!e)return;(async()=>{try{await databases.createDocument(DATABASE_ID,CREATORS_COLLECTION,Appwrite.ID.unique(),{email:e,status:'active'});alert(e+' added as Creator.');}catch(err){alert('Error: '+err.message);}})(); };
