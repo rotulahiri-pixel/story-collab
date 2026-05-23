@@ -69,14 +69,14 @@
         .password-field input { flex: 1; }
         .password-field button { padding: 0.4rem 0.6rem; font-size: 0.8rem; }
         .disclaimer-text { font-size: 0.8rem; color: #7f8c8d; line-height: 1.5; max-height: 200px; overflow-y: auto; text-align: left; }
-        .flow-tabs { display: flex; gap: 0.3rem; margin: 1rem 0; flex-wrap: wrap; }
+        .flow-tabs { display: flex; gap: 0.3rem; margin: 1rem 0 0.3rem 0; flex-wrap: wrap; }
         .flow-tab { padding: 0.5rem 1rem; cursor: pointer; border-radius: 8px 8px 0 0; background: #eee; border: none; font-weight: 600; color: #555; }
         .flow-tab.active.flow1 { background: #2980b9; color: white; }
         .flow-tab.active.flow2 { background: #e67e22; color: white; }
         .flow-tab.active.flow3 { background: #27ae60; color: white; }
-        .flow-status { padding: 0.3rem 0.8rem; border-radius: 12px; font-size: 0.8rem; font-weight: 600; display: inline-block; }
-        .flow-status.flowing { background: #d5f5e3; color: #27ae60; }
-        .flow-status.waiting { background: #fdebd0; color: #e67e22; }
+        .flow-status-text { text-align: center; font-size: 0.75rem; font-weight: 600; margin-bottom: 0.5rem; }
+        .flow-status-text.flowing { color: #27ae60; }
+        .flow-status-text.waiting { color: #e67e22; }
     </style>
 </head>
 <body>
@@ -185,6 +185,7 @@
     const MAX_WORDS = 300;
     const MAX_COMMENT_WORDS = 15;
     const FLOW_NAMES = { flow1: 'Flow One', flow2: 'Flow Two', flow3: 'Flow Three' };
+    const FLOW_IDS = ['flow1', 'flow2', 'flow3'];
 
     const client = new Appwrite.Client();
     client.setEndpoint(APPWRITE_ENDPOINT).setProject(PROJECT_ID);
@@ -202,8 +203,7 @@
     window.addEventListener('load', () => { disclaimerAccepted = false; document.getElementById('disclaimerOverlay').classList.remove('hidden'); document.getElementById('disclaimerPopup').classList.remove('hidden'); loadCompletedStories(); });
     document.getElementById('disclaimerOverlay').addEventListener('click', acceptDisclaimer);
     document.getElementById('acceptDisclaimerBtn').addEventListener('click', acceptDisclaimer);
-
-    window.togglePassword = function(inputId, btn) { const i = document.getElementById(inputId); if (i.type === 'password') { i.type = 'text'; btn.textContent = '🙈'; } else { i.type = 'password'; btn.textContent = '👁️'; } };
+    window.togglePassword = function(inputId, btn) { const i = document.getElementById(inputId); i.type = i.type === 'password' ? 'text' : 'password'; btn.textContent = i.type === 'password' ? '👁️' : '🙈'; };
     function requireDisclaimer() { if (!disclaimerAccepted) { alert('Please accept the disclaimer first.'); return false; } return true; }
 
     // ========== COMPLETED STORIES INDEX ==========
@@ -223,7 +223,62 @@
         document.getElementById('loggedInUser').textContent = '📖 Reader (Guest)';
         document.getElementById('navDashboard').classList.add('hidden');
         currentStoryId = storyId; currentFlowId = null;
-        showView('story'); loadStoryView();
+        showView('story');
+        loadReadModeForce(storyId);
+    };
+
+    async function loadReadModeForce(storyId) {
+        try {
+            const s = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, storyId);
+            let html = `<div class="book-view"><h2>${s.title}</h2><p style="text-align:center;color:#7f8c8d;margin-bottom:2rem;">By ${s.writers || s.creatorName}</p>`;
+            const allCh = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, [Appwrite.Query.equal('storyId', storyId), Appwrite.Query.orderAsc('chapterNumber')]);
+            if (allCh.documents.length === 0) { html += '<p style="text-align:center;">No sessions yet.</p>'; }
+            else {
+                // Session 1 first
+                const s1 = allCh.documents.filter(c => c.chapterNumber === 1);
+                s1.forEach(c => { html += `<div class="session"><p class="session-author">Session 1 — ${c.authorName}</p><p style="white-space:pre-wrap;">${c.content}</p></div>`; });
+                // Then flow sessions if branched
+                if ((s.isBranching === 'true' || s.isBranching === true)) {
+                    html += '<div style="margin:1rem 0;text-align:center;"><strong>Choose a flow:</strong><br>';
+                    FLOW_IDS.forEach(f => { html += `<button onclick="loadReadModeForce('${storyId}','${f}')" class="small" style="margin:0.2rem;">📖 ${FLOW_NAMES[f]}</button>`; });
+                    html += '</div><div id="flowReadSessions"></div>';
+                } else {
+                    const rest = allCh.documents.filter(c => c.chapterNumber > 1);
+                    rest.forEach(c => { html += `<div class="session"><p class="session-author">Session ${c.chapterNumber} — ${c.authorName}</p><p style="white-space:pre-wrap;">${c.content}</p></div>`; });
+                }
+            }
+            html += `<button onclick="closeReadModeForce()" style="margin-top:1.5rem;">Close</button></div>`;
+            document.getElementById('chaptersContainer').innerHTML = html;
+            document.getElementById('sessionOneCard').classList.add('hidden');
+            document.getElementById('storyActionArea').classList.add('hidden');
+            document.getElementById('inviteSection').classList.add('hidden');
+            document.getElementById('branchingArea').classList.add('hidden');
+            document.getElementById('readModeBtn').classList.add('hidden');
+            document.getElementById('backToIndexBtn').classList.add('hidden');
+        } catch (e) { document.getElementById('chaptersContainer').innerHTML = '<p>Error loading story.</p>'; }
+    }
+
+    window.loadReadModeForce = async function(storyId, flowId) {
+        if (!flowId) { loadReadModeForce(storyId); return; }
+        try {
+            const s = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, storyId);
+            let html = `<div class="book-view"><h2>${s.title} — ${FLOW_NAMES[flowId]}</h2><p style="text-align:center;color:#7f8c8d;margin-bottom:2rem;">By ${s.writers || s.creatorName}</p>`;
+            const allCh = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, [Appwrite.Query.equal('storyId', storyId), Appwrite.Query.orderAsc('chapterNumber')]);
+            const s1 = allCh.documents.filter(c => c.chapterNumber === 1);
+            s1.forEach(c => { html += `<div class="session"><p class="session-author">Session 1 — ${c.authorName}</p><p style="white-space:pre-wrap;">${c.content}</p></div>`; });
+            const flowCh = allCh.documents.filter(c => c.flowId === flowId);
+            flowCh.forEach(c => { html += `<div class="session"><p class="session-author">Session ${c.chapterNumber}/${flowId.slice(-1)} — ${c.authorName}</p><p style="white-space:pre-wrap;">${c.content}</p></div>`; });
+            html += `<button onclick="loadReadModeForce('${storyId}')" style="margin-top:1rem;">← Back to flows</button></div>`;
+            document.getElementById('chaptersContainer').innerHTML = html;
+        } catch (e) { document.getElementById('chaptersContainer').innerHTML = '<p>Error.</p>'; }
+    };
+
+    window.closeReadModeForce = function() {
+        document.getElementById('backToIndexBtn').classList.remove('hidden');
+        document.getElementById('readModeBtn').classList.remove('hidden');
+        document.getElementById('storyActionArea').classList.remove('hidden');
+        document.getElementById('sessionOneCard').classList.remove('hidden');
+        if (currentStory) loadStoryView();
     };
 
     // ========== AUTH ==========
@@ -239,7 +294,6 @@
     });
 
     async function googleLogin() { await account.createOAuth2Session('google', window.location.href, window.location.href); const u = await account.get(); u.isGuest = false; u.loginMethod = 'google'; return u; }
-
     document.getElementById('googleLoginBtn').addEventListener('click', async () => { if (!requireDisclaimer()) return; try { currentUser = await googleLogin(); await setUserRole(); showApp(); } catch (err) { alert('Google login failed: ' + err.message); } });
     document.getElementById('loginBtn').addEventListener('click', async () => { if (!requireDisclaimer()) return; const e = document.getElementById('loginEmail').value, p = document.getElementById('loginPassword').value; if (!e || !p) { alert('Email and password required'); return; } try { await account.createEmailSession(e, p); currentUser = await account.get(); currentUser.isGuest = false; currentUser.loginMethod = 'email'; await setUserRole(); showApp(); } catch (err) { alert('Login failed: ' + err.message); } });
     document.getElementById('registerBtn').addEventListener('click', async () => { if (!requireDisclaimer()) return; const n = document.getElementById('regName').value || 'Writer', e = document.getElementById('regEmail').value, p = document.getElementById('regPassword').value; if (p.length < 8) { alert('Password min 8 chars'); return; } if (!e) { alert('Email required'); return; } try { await account.create(Appwrite.ID.unique(), e, p, n); await account.createEmailSession(e, p); currentUser = await account.get(); currentUser.isGuest = false; currentUser.loginMethod = 'email'; await setUserRole(); showApp(); } catch (err) { alert('Registration failed: ' + err.message); } });
@@ -271,7 +325,7 @@
     function showView(view) { ['landingView', 'storyView', 'writerDesk', 'creatorDashboard'].forEach(id => document.getElementById(id).classList.add('hidden')); const m = { landing: 'landingView', story: 'storyView', writer: 'writerDesk', dashboard: 'creatorDashboard' }; if (m[view]) document.getElementById(m[view]).classList.remove('hidden'); document.getElementById('navHome').classList.toggle('active', view !== 'dashboard'); document.getElementById('navDashboard').classList.toggle('active', view === 'dashboard'); }
 
     function goToLanding() { currentFlowId = null; showView('landing'); loadStories(); loadTotalVisits(); loadWriteRequestStories(); }
-    window.goToStory = async function(storyId, flowId) { currentStoryId = storyId; currentFlowId = flowId || null; showView('story'); await recordVisit(storyId); loadStoryView(); };
+    window.goToStory = async function(storyId, flowId) { currentStoryId = storyId; currentFlowId = flowId || 'flow1'; showView('story'); await recordVisit(storyId); loadStoryView(); };
     function goToWriterDesk() { showView('writer'); loadWriterDesk(); }
     function goToDashboard() { if (currentUser && !currentUser.isGuest && currentUser.role !== 'writer') { showView('dashboard'); loadCreatorDashboard(); } else { alert('Dashboard is for Admins, Co-Admins, and Creators only.'); } }
 
@@ -279,27 +333,18 @@
     async function recordVisit(storyId) { try { await databases.createDocument(DATABASE_ID, VISITS_COLLECTION, Appwrite.ID.unique(), { storyId, visitorId: currentUser ? currentUser.email || currentUser.$id : 'anon', visitedAt: new Date().toISOString() }); } catch (e) {} }
     async function loadTotalVisits() { try { const r = await databases.listDocuments(DATABASE_ID, VISITS_COLLECTION); document.getElementById('totalVisits').textContent = '📊 ' + (r.total || r.documents.length) + ' visits'; } catch (e) { document.getElementById('totalVisits').textContent = '📊 0 visits'; } }
 
-    // ========== WRITE REQUEST WITH STORY SELECTION ==========
-    async function loadWriteRequestStories() {
-        const sel = document.getElementById('writeRequestStory');
-        try { const r = await databases.listDocuments(DATABASE_ID, STORIES_COLLECTION, [Appwrite.Query.equal('status', 'active')]); sel.innerHTML = '<option value="">Select a story (optional)</option>' + r.documents.map(s => `<option value="${s.$id}">${s.title}</option>`).join(''); } catch (e) {}
-    }
+    // ========== WRITE REQUEST ==========
+    async function loadWriteRequestStories() { const sel = document.getElementById('writeRequestStory'); try { const r = await databases.listDocuments(DATABASE_ID, STORIES_COLLECTION); const active = r.documents.filter(s => s.status === 'active'); sel.innerHTML = '<option value="">Select a story (optional)</option>' + active.map(s => `<option value="${s.$id}">${s.title}</option>`).join(''); } catch (e) {} }
+    document.getElementById('writeRequestBtn').addEventListener('click', async () => { const email = document.getElementById('writeRequestEmail').value.trim(); if (!email) { alert('Enter your email.'); return; } const storyId = document.getElementById('writeRequestStory').value; try { await databases.createDocument(DATABASE_ID, WRITE_REQUESTS_COLLECTION, Appwrite.ID.unique(), { email, message: 'Requests write access' + (storyId ? ' for story: ' + storyId : ''), createdAt: new Date().toISOString(), storyId: storyId || '' }); document.getElementById('writeRequestEmail').value = ''; alert('Request sent!'); } catch (err) { alert('Error: ' + err.message); } });
 
-    document.getElementById('writeRequestBtn').addEventListener('click', async () => {
-        const email = document.getElementById('writeRequestEmail').value.trim();
-        if (!email) { alert('Enter your email.'); return; }
-        const storyId = document.getElementById('writeRequestStory').value;
-        try { await databases.createDocument(DATABASE_ID, WRITE_REQUESTS_COLLECTION, Appwrite.ID.unique(), { email, message: 'Requests write access' + (storyId ? ' for story: ' + storyId : ''), createdAt: new Date().toISOString(), storyId: storyId || '' }); document.getElementById('writeRequestEmail').value = ''; alert('Request sent!'); } catch (err) { alert('Error: ' + err.message); }
-    });
-
-    // ========== LANDING ==========
+    // ========== LANDING (NO ARCHIVED STORIES) ==========
     async function loadStories() {
         const l = document.getElementById('storiesList'); l.innerHTML = 'Loading...';
         try {
             const r = await databases.listDocuments(DATABASE_ID, STORIES_COLLECTION);
-            const active = r.documents.filter(s => s.status !== 'archived');
-            if (active.length === 0) { l.innerHTML = '<p style="grid-column:1/-1;text-align:center;padding:2rem;">No stories yet.</p>'; return; }
-            l.innerHTML = active.map(s => {
+            const visible = r.documents.filter(s => s.status !== 'archived');
+            if (visible.length === 0) { l.innerHTML = '<p style="grid-column:1/-1;text-align:center;padding:2rem;">No stories yet.</p>'; return; }
+            l.innerHTML = visible.map(s => {
                 const sc = s.status === 'completed' ? 'status-completed' : 'status-active', st = s.status === 'completed' ? '✓ Completed' : '✍️ In Progress';
                 const cd = s.completedAt ? new Date(s.completedAt).toLocaleDateString() : '';
                 const wr = s.writers ? s.writers.split(',').map(w => w.trim()).filter(w => w) : [s.creatorName];
@@ -314,51 +359,15 @@
     window.closePopup = function() { document.getElementById('popupOverlay').classList.add('hidden'); document.getElementById('popupContent').classList.add('hidden'); };
     document.getElementById('popupOverlay').addEventListener('click', window.closePopup);
 
-    // ========== STORY VIEW WITH BRANCHING ==========
+    // ========== STORY VIEW ==========
     document.getElementById('backToIndexBtn').addEventListener('click', () => { currentFlowId = null; goToLanding(); });
-    document.getElementById('readModeBtn').addEventListener('click', () => { try { loadReadMode(currentFlowId); } catch (e) { alert('Read mode error. Please try again.'); } });
-
-    async function loadReadMode(flowId) {
-        try {
-            const s = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId);
-            let html = `<div class="book-view"><h2>${s.title}${flowId ? ' — ' + FLOW_NAMES[flowId] : ''}</h2><p style="text-align:center;color:#7f8c8d;margin-bottom:2rem;">By ${s.writers || s.creatorName}</p>`;
-
-            // Session 1 always first
-            const s1q = [Appwrite.Query.equal('storyId', currentStoryId), Appwrite.Query.equal('chapterNumber', 1)];
-            const s1 = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, s1q);
-            if (s1.documents.length > 0) {
-                html += `<div class="session"><p class="session-author">Session 1 — ${s1.documents[0].authorName}</p><p style="white-space:pre-wrap;">${s1.documents[0].content}</p></div>`;
-            }
-
-            // Then flow sessions
-            if (flowId) {
-                const q = [Appwrite.Query.equal('storyId', currentStoryId), Appwrite.Query.equal('flowId', flowId), Appwrite.Query.orderAsc('chapterNumber')];
-                const ch = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, q);
-                if (ch.documents.length === 0) html += '<p style="text-align:center;margin-top:1rem;">No sessions in this flow yet.</p>';
-                else ch.documents.forEach(c => { html += `<div class="session"><p class="session-author">Session ${c.chapterNumber}/${flowId.slice(-1)} — ${c.authorName}</p><p style="white-space:pre-wrap;">${c.content}</p></div>`; });
-            }
-
-            html += '<button onclick="closeReadMode()" style="margin-top:1.5rem;">Close Read Mode</button>';
-            if ((s.isBranching === 'true' || s.isBranching === true) && !flowId) {
-                html += '<div style="margin-top:1rem;text-align:center;"><p><strong>Select a flow to read:</strong></p>';
-                ['flow1', 'flow2', 'flow3'].forEach(f => { html += `<button onclick="loadReadMode('${f}')" class="small" style="background:#2980b9;margin:0.3rem;color:white;">📖 ${FLOW_NAMES[f]}</button>`; });
-                html += '</div>';
-            }
-            html += '</div>';
-            document.getElementById('chaptersContainer').innerHTML = html;
-            document.getElementById('sessionOneCard').classList.add('hidden');
-            document.getElementById('storyActionArea').classList.add('hidden'); document.getElementById('inviteSection').classList.add('hidden');
-            document.getElementById('branchingArea').classList.add('hidden');
-            document.getElementById('readModeBtn').classList.add('hidden'); document.getElementById('backToIndexBtn').classList.add('hidden');
-        } catch (err) { alert('Error loading read mode. Please try again.'); }
-    }
-    window.closeReadMode = function() { document.getElementById('backToIndexBtn').classList.remove('hidden'); document.getElementById('readModeBtn').classList.remove('hidden'); document.getElementById('storyActionArea').classList.remove('hidden'); document.getElementById('sessionOneCard').classList.remove('hidden'); loadStoryView(); };
+    document.getElementById('readModeBtn').addEventListener('click', () => { loadReadModeForce(currentStoryId); });
 
     async function loadStoryView() {
         document.getElementById('chaptersContainer').innerHTML = 'Loading...'; document.getElementById('storyActionArea').innerHTML = ''; document.getElementById('branchingArea').classList.add('hidden'); document.getElementById('sessionOneCard').classList.add('hidden');
         try {
             currentStory = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId);
-            if (currentStory.status === 'archived') { document.getElementById('chaptersContainer').innerHTML = '<p>📦 This story has been archived.</p>'; return; }
+            if (currentStory.status === 'archived') { document.getElementById('chaptersContainer').innerHTML = '<p>📦 This story has been archived. No reading or writing allowed.</p>'; document.getElementById('storyActionArea').innerHTML = ''; return; }
             const isCompleted = currentStory.status === 'completed';
             const isGuest = currentUser && currentUser.isGuest;
             const canManage = currentUser && !isGuest && (currentUser.isSuperAdmin || currentUser.isCoAdmin || currentUser.$id === currentStory.creatorId);
@@ -366,6 +375,9 @@
             const isBranching = (currentStory.isBranching === 'true' || currentStory.isBranching === true);
             const allCh = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, [Appwrite.Query.equal('storyId', currentStoryId)]);
             const totalChapters = allCh.documents.length;
+
+            // Default to flow1 for branched stories
+            if (isBranching && !currentFlowId) currentFlowId = 'flow1';
 
             // Session 1 display
             const s1chapters = allCh.documents.filter(c => c.chapterNumber === 1);
@@ -379,7 +391,7 @@
             let commentsHtml = '';
             try { const cr = await databases.listDocuments(DATABASE_ID, COMMENTS_COLLECTION, [Appwrite.Query.equal('storyId', currentStoryId), Appwrite.Query.orderDesc('$createdAt')]); if (cr.documents.length > 0) commentsHtml = `<div class="comment-section"><strong>Comments (${cr.documents.length}):</strong><br>${cr.documents.map(c => `<span class="comment-bubble"><strong>${c.userName}:</strong> ${c.content || ''}</span>`).join(' ')}</div>`; } catch (e) {}
 
-            document.getElementById('storyHeader').innerHTML = `<div class="flex-between"><div><h2>${currentStory.title} ${isCompleted ? '🏁' : ''} ${isBranching ? '🌳' : ''} ${currentStory.status === 'archived' ? '📦' : ''}</h2><p style="color:#7f8c8d;">${currentStory.genre ? 'Genre: ' + currentStory.genre : ''}</p><p>Created by: <span class="badge">${currentStory.creatorName}</span></p><p>Status: <span class="badge ${isCompleted ? 'status-completed' : 'status-active'}">${currentStory.status}</span></p></div><div style="text-align:right;"><button class="heart-btn ${userLiked ? 'liked' : ''}" onclick="toggleLike('${currentStoryId}')">${userLiked ? '❤️' : '🤍'} <span id="likeCount">${likeCount}</span></button>${!isGuest ? `<div class="comment-input-row"><input type="text" id="quickComment" placeholder="Add comment..."><button class="small success" onclick="submitComment('${currentStoryId}')">💬</button></div>` : ''}</div></div>${commentsHtml}`;
+            document.getElementById('storyHeader').innerHTML = `<div class="flex-between"><div><h2>${currentStory.title} ${isCompleted ? '🏁' : ''} ${isBranching ? '🌳' : ''}</h2><p style="color:#7f8c8d;">${currentStory.genre ? 'Genre: ' + currentStory.genre : ''}</p><p>Created by: <span class="badge">${currentStory.creatorName}</span></p><p>Status: <span class="badge ${isCompleted ? 'status-completed' : 'status-active'}">${currentStory.status}</span></p></div><div style="text-align:right;"><button class="heart-btn ${userLiked ? 'liked' : ''}" onclick="toggleLike('${currentStoryId}')">${userLiked ? '❤️' : '🤍'} <span id="likeCount">${likeCount}</span></button>${!isGuest ? `<div class="comment-input-row"><input type="text" id="quickComment" placeholder="Add comment..."><button class="small success" onclick="submitComment('${currentStoryId}')">💬</button></div>` : ''}</div></div>${commentsHtml}`;
 
             // BRANCHING UI
             if (totalChapters === 1 && !isBranching && canManage && !isCompleted) {
@@ -388,14 +400,18 @@
             } else if (isBranching) {
                 document.getElementById('branchingArea').classList.remove('hidden');
                 let flowHtml = '<div class="flow-tabs">';
-                ['flow1', 'flow2', 'flow3'].forEach(f => { flowHtml += `<button class="flow-tab ${f} ${currentFlowId === f ? 'active' : ''}" onclick="switchFlow('${f}')">${FLOW_NAMES[f]}</button>`; });
-                flowHtml += '</div><div style="margin-bottom:0.5rem;">';
-                ['flow1', 'flow2', 'flow3'].forEach(f => {
-                    const flowChapters = allCh.documents.filter(c => c.flowId === f);
-                    const flowing = flowChapters.length > 1;
-                    flowHtml += `<span class="flow-status ${flowing ? 'flowing' : 'waiting'}">${FLOW_NAMES[f]}: ${flowing ? 'Flowing' : 'Waiting'}</span> `;
+                FLOW_IDS.forEach(f => {
+                    flowHtml += `<button class="flow-tab ${f} ${currentFlowId === f ? 'active' : ''}" onclick="switchFlow('${f}')">${FLOW_NAMES[f]}</button>`;
                 });
                 flowHtml += '</div>';
+                // Status: Flowing or Waiting, centered below tabs
+                FLOW_IDS.forEach(f => {
+                    const flowChapters = allCh.documents.filter(c => c.flowId === f && c.chapterNumber > 1);
+                    const isFlowing = flowChapters.length > 0;
+                    if (currentFlowId === f) {
+                        flowHtml += `<p class="flow-status-text ${isFlowing ? 'flowing' : 'waiting'}">${isFlowing ? 'Flowing' : 'Waiting'}</p>`;
+                    }
+                });
                 document.getElementById('branchingArea').innerHTML = flowHtml;
             }
 
@@ -421,7 +437,7 @@
         } catch (err) { document.getElementById('chaptersContainer').innerHTML = '<p>Error.</p>'; }
     }
 
-    window.branchStory = async function(storyId) { if (!confirm('Create three separate flows for Session 2?')) return; try { await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, storyId, { isBranching: 'true', branchingStage: 'branched' }); currentStory = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, storyId); currentFlowId = 'flow1'; alert('✅ Story branched!'); loadStoryView(); } catch (err) { alert('Error: ' + err.message); } };
+    window.branchStory = async function(storyId) { if (!confirm('Create three separate flows for Session 2?')) return; try { await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, storyId, { isBranching: 'true', branchingStage: 'branched' }); currentStory = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, storyId); currentFlowId = 'flow1'; alert('✅ Story branched! Select a flow tab and assign writers.'); loadStoryView(); } catch (err) { alert('Error: ' + err.message); } };
     window.switchFlow = function(flowId) { currentFlowId = flowId; loadStoryView(); };
 
     async function handlePasswordEntry() { const pw = prompt("Enter story access password:"); if (pw && pw === currentStory.accessPassword) { await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId, { currentWriterId: currentUser.$id }); currentStory.currentWriterId = currentUser.$id; goToWriterDesk(); } else { alert("Incorrect."); } }
@@ -448,6 +464,7 @@
     async function loadWriterDesk() {
         if (!currentStory) { try { currentStory = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId); } catch (e) { alert('Error'); goToLanding(); return; } }
         if (currentStory.status === 'completed') { alert('Completed.'); window.goToStory(currentStoryId); return; }
+        if (currentStory.status === 'archived') { alert('Archived.'); window.goToStory(currentStoryId); return; }
         if (!currentUser.canWrite) { alert('No write permission.'); window.goToStory(currentStoryId); return; }
         const canManage = currentUser && (currentUser.isSuperAdmin || currentUser.isCoAdmin || currentUser.$id === currentStory.creatorId);
         const hasTurn = currentUser && currentUser.$id === currentStory.currentWriterId;
@@ -460,11 +477,11 @@
     }
     async function loadPreviousSessions() { const pl = document.getElementById('prevChaptersList'); const lc = document.getElementById('lastSessionCard'); pl.innerHTML = 'Loading...'; lc.classList.add('hidden'); try { const q = [Appwrite.Query.equal('storyId', currentStoryId), Appwrite.Query.orderDesc('chapterNumber'), Appwrite.Query.limit(5)]; if (currentFlowId) q.push(Appwrite.Query.equal('flowId', currentFlowId)); const res = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, q); if (res.documents.length === 0) { pl.innerHTML = '<p>No sessions yet.</p>'; return; } const last = res.documents[0]; lc.classList.remove('hidden'); lc.innerHTML = `<h4>Last Session (Session ${last.chapterNumber}${last.flowId ? '/' + last.flowId.slice(-1) : ''}) — by ${last.authorName}</h4><p style="white-space:pre-wrap;margin-top:0.5rem;">${last.content}</p><small>${new Date(last.$createdAt).toLocaleString()}</small>`; pl.innerHTML = res.documents.length > 1 ? '<h4>Earlier Sessions:</h4>' + res.documents.slice(1).map(c => `<div class="card" style="padding:0.8rem;font-size:0.85rem;"><strong>Session ${c.chapterNumber}${c.flowId ? '/' + c.flowId.slice(-1) : ''}</strong> — ${c.authorName}: ${c.content.substring(0, 80)}...</div>`).join('') : ''; } catch (err) { pl.innerHTML = '<p>Error.</p>'; } }
 
-    // ========== DASHBOARD WITH ARCHIVE ==========
-    async function loadCreatorDashboard() { const le = document.getElementById('creatorStoriesList'); if (!currentUser || currentUser.isGuest) { le.innerHTML = '<p>Please login.</p>'; return; } if (currentUser.role === 'writer') { le.innerHTML = '<p>Dashboard is for Admins, Co-Admins, and Creators.</p>'; return; } le.innerHTML = 'Loading...'; try { const [ms, ar] = await Promise.all([databases.listDocuments(DATABASE_ID, STORIES_COLLECTION, [Appwrite.Query.equal('creatorId', currentUser.$id)]), (currentUser.isSuperAdmin || currentUser.isCoAdmin) ? databases.listDocuments(DATABASE_ID, STORIES_COLLECTION) : Promise.resolve({ documents: [] })]); const as = [...ms.documents]; if (currentUser.isSuperAdmin || currentUser.isCoAdmin) ar.documents.forEach(s => { if (!as.find(m => m.$id === s.$id)) as.push(s); }); let h = `<div class="card" style="margin-bottom:1.5rem;border-left:4px solid #5b6fe6;grid-column:1/-1;"><h3>${getUserBadge()} Dashboard</h3>`; if (currentUser.canCreate) h += '<button onclick="createNewStory()" class="success">+ Create New Story</button> '; h += '<button onclick="dashboardInvite()" class="outline">📨 Grant Write Access</button> '; h += '<button onclick="viewWriteRequests()" class="small">📋 View Requests</button> '; if (currentUser.isSuperAdmin || currentUser.isCoAdmin) { h += '<button onclick="preApproveCreator()" class="outline small">➕ Pre-approve Creator</button> '; h += '<button onclick="setCoAdmin()" class="outline small">🤝 Set Co-Admin</button> '; h += '<button onclick="viewRecentLogins()" class="small">👥 Recent Logins</button> '; h += '<button onclick="viewArchivedStories()" class="small">📦 Archived</button> '; } h += '</div>'; if (as.length === 0) h += '<p style="grid-column:1/-1;">No stories yet.</p>'; else h += as.map(s => { const io = s.creatorId === currentUser.$id; const br = (s.isBranching === 'true' || s.isBranching === true) ? ' 🌳' : ''; const isArch = s.status === 'archived'; return `<div class="card"><div class="flex-between"><h3>${s.title}${br} ${!io ? '(Editor)' : ''}</h3><span class="badge ${isArch ? 'status-archived' : (s.status === 'completed' ? 'status-completed' : 'status-active')}">${isArch ? '📦 Archived' : (s.status === 'completed' ? '✓ Completed' : '✍️ In Progress')}</span></div><p style="font-size:0.85rem;color:#7f8c8d;">Genre: ${s.genre || 'None'} | Writers: ${s.writers || s.creatorName}</p><div class="flex-row" style="margin-top:0.5rem;"><button onclick="goToStory('${s.$id}')" class="small">📖 View</button>${!isArch ? `<button onclick="goToWriterDeskFromDashboard('${s.$id}')" class="small">✍️ Write</button>${s.status !== 'completed' ? `<button onclick="completeStory('${s.$id}')" class="danger small">🏁 End</button>` : ''}<button onclick="archiveStory('${s.$id}')" class="warn small">📦 Archive</button>` : `<button onclick="unarchiveStory('${s.$id}')" class="success small">📂 Retrieve</button>`}<button onclick="editStoryDetails('${s.$id}')" class="outline small">✏️ Edit</button></div></div>`; }).join(''); le.innerHTML = h; } catch (err) { le.innerHTML = '<p>Error: ' + err.message + '</p>'; } }
+    // ========== DASHBOARD (ARCHIVE: ADMIN ONLY) ==========
+    async function loadCreatorDashboard() { const le = document.getElementById('creatorStoriesList'); if (!currentUser || currentUser.isGuest) { le.innerHTML = '<p>Please login.</p>'; return; } if (currentUser.role === 'writer') { le.innerHTML = '<p>Dashboard is for Admins, Co-Admins, and Creators.</p>'; return; } le.innerHTML = 'Loading...'; try { const [ms, ar] = await Promise.all([databases.listDocuments(DATABASE_ID, STORIES_COLLECTION, [Appwrite.Query.equal('creatorId', currentUser.$id)]), (currentUser.isSuperAdmin || currentUser.isCoAdmin) ? databases.listDocuments(DATABASE_ID, STORIES_COLLECTION) : Promise.resolve({ documents: [] })]); const as = [...ms.documents]; if (currentUser.isSuperAdmin || currentUser.isCoAdmin) ar.documents.forEach(s => { if (!as.find(m => m.$id === s.$id)) as.push(s); }); let h = `<div class="card" style="margin-bottom:1.5rem;border-left:4px solid #5b6fe6;grid-column:1/-1;"><h3>${getUserBadge()} Dashboard</h3>`; if (currentUser.canCreate) h += '<button onclick="createNewStory()" class="success">+ Create New Story</button> '; h += '<button onclick="dashboardInvite()" class="outline">📨 Grant Write Access</button> '; h += '<button onclick="viewWriteRequests()" class="small">📋 View Requests</button> '; if (currentUser.isSuperAdmin || currentUser.isCoAdmin) { h += '<button onclick="preApproveCreator()" class="outline small">➕ Pre-approve Creator</button> '; h += '<button onclick="setCoAdmin()" class="outline small">🤝 Set Co-Admin</button> '; h += '<button onclick="viewRecentLogins()" class="small">👥 Recent Logins</button> '; h += '<button onclick="viewArchivedStories()" class="small">📦 Archived</button> '; } h += '</div>'; if (as.length === 0) h += '<p style="grid-column:1/-1;">No stories yet.</p>'; else h += as.map(s => { const io = s.creatorId === currentUser.$id; const br = (s.isBranching === 'true' || s.isBranching === true) ? ' 🌳' : ''; const isArch = s.status === 'archived'; const showArchive = currentUser.isSuperAdmin; return `<div class="card"><div class="flex-between"><h3>${s.title}${br} ${!io ? '(Editor)' : ''}</h3><span class="badge ${isArch ? 'status-archived' : (s.status === 'completed' ? 'status-completed' : 'status-active')}">${isArch ? '📦 Archived' : (s.status === 'completed' ? '✓ Completed' : '✍️ In Progress')}</span></div><p style="font-size:0.85rem;color:#7f8c8d;">Genre: ${s.genre || 'None'} | Writers: ${s.writers || s.creatorName}</p><div class="flex-row" style="margin-top:0.5rem;"><button onclick="goToStory('${s.$id}')" class="small">📖 View</button>${!isArch ? `<button onclick="goToWriterDeskFromDashboard('${s.$id}')" class="small">✍️ Write</button>${s.status !== 'completed' ? `<button onclick="completeStory('${s.$id}')" class="danger small">🏁 End</button>` : ''}${showArchive ? `<button onclick="archiveStory('${s.$id}')" class="warn small">📦 Archive</button>` : ''}` : `${showArchive ? `<button onclick="unarchiveStory('${s.$id}')" class="success small">📂 Retrieve</button>` : ''}`}<button onclick="editStoryDetails('${s.$id}')" class="outline small">✏️ Edit</button></div></div>`; }).join(''); le.innerHTML = h; } catch (err) { le.innerHTML = '<p>Error: ' + err.message + '</p>'; } }
 
-    window.archiveStory = async function(sid) { if (!confirm('Archive this story?')) return; try { await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, sid, { status: 'archived' }); alert('Archived!'); loadCreatorDashboard(); loadStories(); } catch (err) { alert('Error: ' + err.message); } };
-    window.unarchiveStory = async function(sid) { try { await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, sid, { status: 'active' }); alert('Retrieved!'); loadCreatorDashboard(); loadStories(); } catch (err) { alert('Error: ' + err.message); } };
+    window.archiveStory = async function(sid) { if (!currentUser.isSuperAdmin) { alert('Only Admin can archive.'); return; } if (!confirm('Archive this story? It will be hidden from all readers and writers.')) return; try { await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, sid, { status: 'archived' }); alert('Archived!'); loadCreatorDashboard(); loadStories(); } catch (err) { alert('Error: ' + err.message); } };
+    window.unarchiveStory = async function(sid) { if (!currentUser.isSuperAdmin) { alert('Only Admin can retrieve.'); return; } try { await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, sid, { status: 'active' }); alert('Retrieved!'); loadCreatorDashboard(); loadStories(); } catch (err) { alert('Error: ' + err.message); } };
     window.viewArchivedStories = function() { (async () => { try { const r = await databases.listDocuments(DATABASE_ID, STORIES_COLLECTION, [Appwrite.Query.equal('status', 'archived')]); if (r.documents.length === 0) { alert('No archived stories.'); return; } alert('Archived Stories:\n\n' + r.documents.map(s => '📦 ' + s.title).join('\n')); } catch (err) { alert('Error: ' + err.message); } })(); };
 
     window.dashboardInvite = function() { const e = prompt("Gmail to grant write access:"); if (!e) return; (async () => { try { await databases.createDocument(DATABASE_ID, CREATORS_COLLECTION, Appwrite.ID.unique(), { email: e, status: 'active' }); alert(`✅ Write access granted to ${e}!`); } catch (err) { alert('Error: ' + err.message); } })(); };
