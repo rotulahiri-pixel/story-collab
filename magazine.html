@@ -7,338 +7,107 @@
     <script src="https://cdn.jsdelivr.net/npm/appwrite@13.0.2"></script>
     <style>
         :root {
-            --cream: #f5f0e8;
-            --sepia: #e8dcc8;
-            --ink: #2c2416;
-            --accent: #8b4513;
-            --gold: #b8860b;
+            --cream: #f5f0e8; --sepia: #e8dcc8; --ink: #2c2416; --accent: #8b4513; --gold: #b8860b;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             background: #2c1810;
             background-image: radial-gradient(ellipse at center, #4a2a1a 0%, #1a0c06 100%);
             font-family: 'Georgia', 'Times New Roman', serif;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            padding: 0.5rem;
-            user-select: none;
-            -webkit-user-select: none;
-            overflow-x: hidden;
+            display: flex; align-items: center; justify-content: center;
+            min-height: 100vh; padding: 0.5rem;
+            user-select: none; -webkit-user-select: none; overflow-x: hidden;
         }
-        .app-container {
-            width: 100%;
-            max-width: 400px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        /* Book spine (decorative) */
+        .app-container { width: 100%; max-width: 400px; display: flex; flex-direction: column; align-items: center; }
         .book-spine {
-            position: absolute;
-            top: 0; left: -18px; bottom: 0;
-            width: 18px;
+            position: absolute; top: 0; left: -18px; bottom: 0; width: 18px;
             background: linear-gradient(to right, #3c2415, #5a3a2a, #3c2415);
-            border-radius: 4px 0 0 4px;
-            box-shadow: inset -2px 0 4px rgba(0,0,0,0.5);
-            z-index: 5;
+            border-radius: 4px 0 0 4px; box-shadow: inset -2px 0 4px rgba(0,0,0,0.5); z-index: 5;
         }
-
-        /* Flipping book container */
-        .book-flip-container {
-            position: relative;
-            width: 100%;
-            perspective: 1500px;
-            padding-bottom: 150%;  /* tall portrait */
-        }
-
-        /* The stack of pages */
+        .book-flip-container { position: relative; width: 100%; perspective: 1500px; padding-bottom: 150%; }
         .page {
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: var(--cream);
-            border-radius: 0 6px 6px 0;
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: var(--cream); border-radius: 0 6px 6px 0;
             box-shadow: 0 4px 20px rgba(0,0,0,0.5), inset 0 0 30px rgba(139,69,19,0.05);
             transform-origin: left center;
             transition: transform 0.7s cubic-bezier(0.645, 0.045, 0.355, 1);
-            backface-visibility: hidden;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
+            backface-visibility: hidden; overflow: hidden; display: flex; flex-direction: column;
         }
-
-        .page.flipped {
-            transform: rotateY(-180deg);
-        }
-
-        /* Page content area */
-        .page-content {
-            flex: 1;
-            padding: 1.2rem 1rem;
-            overflow-y: auto;
-            font-size: 0.9rem;
-            line-height: 1.6;
-            color: var(--ink);
-        }
-        .page-number {
-            text-align: center;
-            font-size: 0.7rem;
-            color: var(--accent);
-            padding: 0.4rem;
-            border-top: 1px solid var(--sepia);
-            background: var(--cream);
-            z-index: 2;
-        }
-
-        /* Navigation */
-        .nav-bar {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            margin-top: 1rem;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
+        .page.flipped { transform: rotateY(-180deg); }
+        .page-content { flex: 1; padding: 1.2rem 1rem; overflow-y: auto; font-size: 0.9rem; line-height: 1.6; color: var(--ink); }
+        .page-number { text-align: center; font-size: 0.7rem; color: var(--accent); padding: 0.4rem; border-top: 1px solid var(--sepia); background: var(--cream); }
+        .nav-bar { display: flex; align-items: center; gap: 1rem; margin-top: 1rem; flex-wrap: wrap; justify-content: center; }
         .nav-btn {
-            background: var(--cream);
-            color: var(--ink);
-            border: 2px solid var(--accent);
-            padding: 0.6rem 1.2rem;
-            font-family: 'Georgia', serif;
-            font-size: 0.9rem;
-            cursor: pointer;
-            border-radius: 4px;
-            letter-spacing: 1px;
-            transition: all 0.3s;
-            min-width: 80px;
-            text-align: center;
+            background: var(--cream); color: var(--ink); border: 2px solid var(--accent);
+            padding: 0.6rem 1.2rem; font-family: 'Georgia', serif; font-size: 0.9rem;
+            cursor: pointer; border-radius: 4px; letter-spacing: 1px; transition: all 0.3s; min-width: 80px; text-align: center;
         }
         .nav-btn:hover { background: var(--accent); color: var(--cream); }
         .nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-        .page-indicator {
-            color: var(--cream);
-            font-family: 'Georgia', serif;
-            font-size: 0.85rem;
-            letter-spacing: 2px;
-            margin-top: 0.5rem;
-            text-align: center;
-        }
+        .page-indicator { color: var(--cream); font-family: 'Georgia', serif; font-size: 0.85rem; letter-spacing: 2px; margin-top: 0.5rem; text-align: center; }
         .fetch-btn {
-            background: var(--gold);
-            color: var(--ink);
-            border: 2px solid var(--accent);
-            padding: 0.5rem 1rem;
-            font-family: 'Georgia', serif;
-            font-size: 0.85rem;
-            cursor: pointer;
-            border-radius: 4px;
-            margin-top: 0.8rem;
-            letter-spacing: 1px;
+            background: var(--gold); color: var(--ink); border: 2px solid var(--accent);
+            padding: 0.5rem 1rem; font-family: 'Georgia', serif; font-size: 0.85rem;
+            cursor: pointer; border-radius: 4px; margin-top: 0.8rem; letter-spacing: 1px;
         }
         .fetch-btn:hover { background: var(--accent); color: var(--cream); }
-        .fetch-status {
-            color: var(--cream);
-            font-size: 0.8rem;
-            margin-top: 0.3rem;
-            text-align: center;
-            font-style: italic;
-        }
-
-        /* Typography */
-        .magazine-title {
-            font-size: 1.6rem;
-            font-weight: bold;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            color: var(--ink);
-            text-align: center;
-            margin-bottom: 0.4rem;
-        }
-        .magazine-subtitle {
-            font-size: 0.75rem;
-            font-style: italic;
-            text-align: center;
-            color: var(--accent);
-            letter-spacing: 1px;
-            margin-bottom: 0.8rem;
-        }
-        .issue-line {
-            text-align: center;
-            font-size: 0.7rem;
-            letter-spacing: 2px;
-            color: var(--accent);
-            border-top: 2px double var(--gold);
-            border-bottom: 2px double var(--gold);
-            padding: 0.3rem 0;
-            margin-bottom: 0.8rem;
-        }
-        .story-title {
-            font-size: 1.1rem;
-            font-weight: bold;
-            color: var(--ink);
-            margin-bottom: 0.2rem;
-        }
-        .story-authors {
-            font-size: 0.7rem;
-            font-style: italic;
-            color: var(--accent);
-            margin-bottom: 0.6rem;
-        }
-        .story-text {
-            font-size: 0.85rem;
-            line-height: 1.6;
-            color: var(--ink);
-            text-align: justify;
-        }
+        .fetch-status { color: var(--cream); font-size: 0.8rem; margin-top: 0.3rem; text-align: center; font-style: italic; }
+        .magazine-title { font-size: 1.6rem; font-weight: bold; letter-spacing: 2px; text-transform: uppercase; color: var(--ink); text-align: center; margin-bottom: 0.4rem; }
+        .magazine-subtitle { font-size: 0.75rem; font-style: italic; text-align: center; color: var(--accent); letter-spacing: 1px; margin-bottom: 0.8rem; }
+        .story-title { font-size: 1.1rem; font-weight: bold; color: var(--ink); margin-bottom: 0.2rem; }
+        .story-authors { font-size: 0.7rem; font-style: italic; color: var(--accent); margin-bottom: 0.6rem; }
+        .story-text { font-size: 0.85rem; line-height: 1.6; color: var(--ink); text-align: justify; }
         .story-text p { margin-bottom: 0.6rem; }
-        .dropcap::first-letter {
-            float: left;
-            font-size: 2.8rem;
-            line-height: 0.8;
-            padding-right: 0.3rem;
-            color: var(--accent);
-            font-weight: bold;
-        }
-        .session-label {
-            font-style: italic;
-            color: var(--accent);
-            font-size: 0.75rem;
-            margin-bottom: 0.2rem;
-        }
-        .story-end {
-            text-align: center;
-            font-style: italic;
-            color: var(--accent);
-            margin-top: 0.4rem;
-            font-size: 0.8rem;
-        }
-        .share-mini {
-            font-size: 0.7rem;
-            color: var(--accent);
-            cursor: pointer;
-            text-decoration: underline;
-            margin-left: 0.5rem;
-        }
-        .cover-title {
-            font-size: 2rem;
-            font-weight: bold;
-            letter-spacing: 4px;
-            text-align: center;
-            color: var(--gold);
-            text-shadow: 2px 2px 0 rgba(0,0,0,0.3);
-            margin: 1rem 0;
-        }
-        .cover-divider {
-            width: 60%;
-            margin: 0.8rem auto;
-            border-top: 2px double var(--gold);
-        }
+        .dropcap::first-letter { float: left; font-size: 2.8rem; line-height: 0.8; padding-right: 0.3rem; color: var(--accent); font-weight: bold; }
+        .session-label { font-style: italic; color: var(--accent); font-size: 0.75rem; margin-bottom: 0.2rem; }
+        .story-end { text-align: center; font-style: italic; color: var(--accent); margin-top: 0.4rem; font-size: 0.8rem; }
+        .share-mini { font-size: 0.7rem; color: var(--accent); cursor: pointer; text-decoration: underline; margin-left: 0.5rem; }
+        .cover-title { font-size: 2rem; font-weight: bold; letter-spacing: 4px; text-align: center; color: var(--gold); text-shadow: 2px 2px 0 rgba(0,0,0,0.3); margin: 1rem 0; }
+        .cover-divider { width: 60%; margin: 0.8rem auto; border-top: 2px double var(--gold); }
     </style>
 </head>
 <body>
 <div class="app-container">
-    <!-- Book with spine and flipping pages -->
     <div style="position:relative; width:100%;">
         <div class="book-spine"></div>
-        <div class="book-flip-container" id="flipContainer">
-            <!-- Pages dynamically inserted -->
-        </div>
+        <div class="book-flip-container" id="flipContainer"></div>
     </div>
-
     <div class="nav-bar">
         <button class="nav-btn" id="prevBtn" onclick="prevPage()">◀ Prev</button>
         <button class="nav-btn" id="nextBtn" onclick="nextPage()">Next ▶</button>
     </div>
     <div class="page-indicator" id="pageIndicator">Cover</div>
-
     <button class="fetch-btn" onclick="fetchLiveStories()">📡 Fetch Stories from Appwrite</button>
     <div class="fetch-status" id="fetchStatus"></div>
 </div>
 
 <script>
-    // ==================== CONFIGURATION ====================
-    const APPSETTINGS = {
-        endpoint: 'https://fra.cloud.appwrite.io/v1',
-        projectId: 'rotulahiri',   // <-- Replace with your real project ID
-        databaseId: 'stories_db',
-        storiesCollection: 'stories',
-        chaptersCollection: 'chapters'
-    };
+    // ===== REPLACE WITH YOUR REAL PROJECT ID =====
+    const PROJECT_ID = 'rotulahiri';   // ← CHANGE THIS
+    const DATABASE_ID = 'stories_db';
+    const STORIES_COLLECTION = 'stories';
+    const CHAPTERS_COLLECTION = 'chapters';
+    const ENDPOINT = 'https://fra.cloud.appwrite.io/v1';
 
-    // ==================== SAMPLE PAGES (offline fallback) ====================
+    // Sample offline pages
     const samplePages = [
-        // Cover
         `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;padding:1.5rem;">
             <div style="font-size:0.8rem;letter-spacing:3px;color:var(--accent);margin-bottom:0.8rem;">A MONTHLY COLLECTION</div>
-            <div class="cover-title">RelayTale</div>
-            <div class="cover-divider"></div>
+            <div class="cover-title">RelayTale</div><div class="cover-divider"></div>
             <div class="magazine-subtitle">Where Writers Create Stories By Turn</div>
-            <div style="margin-top:1.5rem;font-size:0.8rem;letter-spacing:2px;color:var(--accent);">VOL. I — SAMPLE ISSUE</div>
-            <div style="margin-top:2rem;font-size:0.7rem;color:var(--ink);">Featuring</div>
-            <div style="font-size:0.8rem;color:var(--accent);margin-top:0.3rem;">The Lost Kingdom • Echoes of Tomorrow</div>
+            <div style="margin-top:1.5rem;font-size:0.8rem;letter-spacing:2px;color:var(--accent);">SAMPLE ISSUE</div>
         </div>`,
-        // TOC + Editor's Note
-        `<div style="padding:1rem;">
-            <div style="background:var(--sepia);padding:0.6rem;margin:0.6rem 0;font-style:italic;font-size:0.75rem;border-left:3px solid var(--accent);">
-                <strong>✒️ Editor's Note</strong><br>Welcome to RelayTale Monthly. Stories crafted by a relay of writers.
-            </div>
-            <div style="text-align:center;margin:0.8rem 0;color:var(--accent);font-size:0.9rem;letter-spacing:2px;">In This Issue</div>
-            <div style="padding:0.2rem 0;border-bottom:1px dotted var(--sepia);">📖 The Lost Kingdom — by Alice, Bob, Charlie, Diana</div>
-            <div style="padding:0.2rem 0;border-bottom:1px dotted var(--sepia);">📖 Echoes of Tomorrow — by Eve, Frank, Grace</div>
-        </div>`,
-        // Story 1
-        `<div style="padding:1rem;">
-            <div class="story-title">The Lost Kingdom</div>
-            <div class="story-authors">By Alice, Bob, Charlie, and Diana</div>
-            <div class="story-text dropcap">
-                <p class="session-label">Session 1 — by Alice</p>
-                <p>In the shadow of the ancient mountains, where mist clung to the pines like whispered secrets, a kingdom lay hidden from the world.</p>
-                <p class="session-label">Session 2 — by Bob</p>
-                <p>Princess Mireia was seven when the gates closed. For twelve years she trained in the Old Language.</p>
-                <p class="session-label">Session 3 — by Charlie</p>
-                <p>"I know the way through the eastern pass," said the stranger, "but the price is a memory."</p>
-                <p class="session-label">Session 4 — by Diana</p>
-                <p>Mireia stepped forward into the mist, leaving everything behind.</p>
-                <p class="story-end">🏁 The End <span class="share-mini" onclick="shareStory('The Lost Kingdom')">Share</span></p>
-            </div>
-        </div>`,
-        // Story 2
-        `<div style="padding:1rem;">
-            <div class="story-title">Echoes of Tomorrow</div>
-            <div class="story-authors">By Eve, Frank, and Grace</div>
-            <div class="story-text dropcap">
-                <p class="session-label">Session 1 — by Eve</p>
-                <p>The chronometer on Dr. Elara Vance's wrist flickered. She had forty-seven minutes before the time-stream collapsed.</p>
-                <p class="session-label">Session 2 — by Frank</p>
-                <p>"You're not supposed to be here," said Meera, born in 1912, brought here by the time-stream.</p>
-                <p class="session-label">Session 3 — by Grace</p>
-                <p>They watched the countdown together. "Whatever happens, we existed. We were here."</p>
-                <p class="story-end">🏁 The End <span class="share-mini" onclick="shareStory('Echoes of Tomorrow')">Share</span></p>
-            </div>
-        </div>`,
-        // Back cover
-        `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;padding:1.5rem;">
-            <div class="cover-title" style="font-size:1.5rem;">RelayTale</div>
-            <div class="cover-divider"></div>
-            <p style="font-size:0.8rem;color:var(--ink);margin-top:0.8rem;">Where Writers Create Stories By Turn</p>
-            <p style="font-size:0.7rem;color:var(--accent);margin-top:1.5rem;">Published by RelayTale Press</p>
-            <p style="font-size:0.65rem;color:var(--ink);margin-top:0.3rem;">rotulahiri@gmail.com</p>
-            <p style="font-size:0.6rem;color:var(--accent);margin-top:1.5rem;">© 2026 RelayTale. All rights reserved.</p>
-        </div>`
+        `<div style="padding:1rem;"><div class="story-title">Sample Story</div><div class="story-authors">By Sample Author</div><div class="story-text"><p>This is a sample. Fetch real stories from Appwrite.</p></div></div>`
     ];
 
-    // ==================== STATE ====================
     let pages = [...samplePages];
-    let currentPageIndex = 0;   // index of the topmost (visible) page
+    let currentPageIndex = 0;
     const flipContainer = document.getElementById('flipContainer');
     const prevBtn = document.getElementById('prevBtn');
     const nextBtn = document.getElementById('nextBtn');
     const pageIndicator = document.getElementById('pageIndicator');
     const fetchStatus = document.getElementById('fetchStatus');
 
-    // Build the page stack
     function renderBook() {
         flipContainer.innerHTML = '';
         for (let i = pages.length - 1; i >= 0; i--) {
@@ -346,25 +115,15 @@
             pageDiv.className = 'page';
             pageDiv.dataset.index = i;
             pageDiv.style.zIndex = pages.length - i;
-
-            // Content wrapper
             const contentDiv = document.createElement('div');
             contentDiv.className = 'page-content';
             contentDiv.innerHTML = pages[i];
-
-            // Page number
             const pageNum = document.createElement('div');
             pageNum.className = 'page-number';
             pageNum.textContent = i + 1;
-
             pageDiv.appendChild(contentDiv);
             pageDiv.appendChild(pageNum);
-
-            // Initially, all pages before currentPageIndex are flipped
-            if (i < currentPageIndex) {
-                pageDiv.classList.add('flipped');
-            }
-
+            if (i < currentPageIndex) pageDiv.classList.add('flipped');
             flipContainer.appendChild(pageDiv);
         }
         updateNav();
@@ -372,165 +131,89 @@
 
     function nextPage() {
         if (currentPageIndex < pages.length - 1) {
-            // Flip the current topmost (visible) page
-            const visiblePage = flipContainer.querySelector(`[data-index="${currentPageIndex}"]`);
-            if (visiblePage) {
-                visiblePage.classList.add('flipped');
-            }
+            flipContainer.querySelector(`[data-index="${currentPageIndex}"]`).classList.add('flipped');
             currentPageIndex++;
             updateNav();
         }
     }
-
     function prevPage() {
         if (currentPageIndex > 0) {
             currentPageIndex--;
-            // Unflip the page that is now the topmost
-            const pageToUnflip = flipContainer.querySelector(`[data-index="${currentPageIndex}"]`);
-            if (pageToUnflip) {
-                pageToUnflip.classList.remove('flipped');
-            }
+            flipContainer.querySelector(`[data-index="${currentPageIndex}"]`).classList.remove('flipped');
             updateNav();
         }
     }
-x	
     function updateNav() {
         prevBtn.disabled = currentPageIndex === 0;
         nextBtn.disabled = currentPageIndex === pages.length - 1;
-        pageIndicator.textContent =
-            currentPageIndex === 0 ? 'Cover' :
-            currentPageIndex === pages.length - 1 ? 'Back Cover' :
-            `Page ${currentPageIndex + 1} of ${pages.length}`;
+        pageIndicator.textContent = currentPageIndex === 0 ? 'Cover' : currentPageIndex === pages.length - 1 ? 'Back Cover' : `Page ${currentPageIndex + 1} of ${pages.length}`;
     }
 
-    // ==================== SHARE ====================
     window.shareStory = function(title) {
         const url = window.location.href;
-        const text = `Read "${title}" from RelayTale Monthly — a collaborative story.`;
-        if (navigator.share) {
-            navigator.share({ title, text, url }).catch(() => {});
-        } else {
-            navigator.clipboard.writeText(text + ' ' + url).then(() => {
-                alert('Link copied! Share it anywhere.');
-            }).catch(() => prompt('Copy this link:', url));
+        const text = `Read "${title}" from RelayTale Monthly.`;
+        if (navigator.share) navigator.share({ title, text, url }).catch(() => {});
+        else {
+            navigator.clipboard.writeText(text + ' ' + url).then(() => alert('Link copied!')).catch(() => prompt('Copy:', url));
         }
     };
 
-    // ==================== FETCH FROM APPWRITE (ALL STORIES) ====================
     window.fetchLiveStories = async function() {
-        if (!APPSETTINGS.projectId || APPSETTINGS.projectId === 'YOUR_PROJECT_ID') {
-            alert('Please set your Appwrite Project ID in APPSETTINGS.projectId');
+        if (PROJECT_ID === 'YOUR_PROJECT_ID') {
+            alert('Please replace YOUR_PROJECT_ID with your real Appwrite Project ID in the code.');
             return;
         }
-        fetchStatus.textContent = 'Fetching all stories...';
+        fetchStatus.textContent = 'Fetching...';
         try {
             const client = new Appwrite.Client();
-            client.setEndpoint(APPSETTINGS.endpoint).setProject(APPSETTINGS.projectId);
+            client.setEndpoint(ENDPOINT).setProject(PROJECT_ID);
             const databases = new Appwrite.Databases(client);
-
-            const storiesRes = await databases.listDocuments(
-                APPSETTINGS.databaseId,
-                APPSETTINGS.storiesCollection
-            );
-
+            const storiesRes = await databases.listDocuments(DATABASE_ID, STORIES_COLLECTION);
             if (storiesRes.documents.length === 0) {
-                fetchStatus.textContent = 'No stories found. Showing samples.';
+                fetchStatus.textContent = 'No stories found.';
                 return;
             }
-
             const newPages = [];
-
-            // Cover
-            newPages.push(
-                `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;padding:1.5rem;">
-                    <div style="font-size:0.8rem;letter-spacing:3px;color:var(--accent);margin-bottom:0.8rem;">A MONTHLY COLLECTION</div>
-                    <div class="cover-title">RelayTale</div>
-                    <div class="cover-divider"></div>
-                    <div class="magazine-subtitle">Where Writers Create Stories By Turn</div>
-                    <div style="margin-top:1.5rem;font-size:0.8rem;letter-spacing:2px;color:var(--accent);">LATEST ISSUE</div>
-                    <div style="margin-top:2rem;font-size:0.7rem;color:var(--ink);">Featuring</div>
-                    <div style="font-size:0.8rem;color:var(--accent);margin-top:0.3rem;">${storiesRes.documents.map(s => s.title).join(' • ')}</div>
-                </div>`
-            );
-
+            newPages.push(`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;padding:1.5rem;">
+                <div class="cover-title">RelayTale</div><div class="cover-divider"></div>
+                <div style="margin-top:1rem;">Featuring:<br>${storiesRes.documents.map(s => s.title).join(' • ')}</div>
+            </div>`);
             for (const story of storiesRes.documents) {
-                const chaptersRes = await databases.listDocuments(
-                    APPSETTINGS.databaseId,
-                    APPSETTINGS.chaptersCollection,
-                    [Appwrite.Query.equal('storyId', story.$id), Appwrite.Query.orderAsc('chapterNumber')]
-                );
-                const chapters = chaptersRes.documents;
-                if (chapters.length === 0) continue;
-
-                let storyHtml = `<div style="padding:1rem;">
-                    <div class="story-title">${story.title}</div>
-                    <div class="story-authors">By ${story.writers || story.creatorName}</div>
-                    <div class="story-text dropcap">`;
-
-                chapters.forEach(ch => {
-                    storyHtml += `<p class="session-label">Session ${ch.chapterNumber} — by ${ch.authorName}</p>
-                                  <p>${ch.content}</p>`;
+                const chRes = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, [
+                    Appwrite.Query.equal('storyId', story.$id), Appwrite.Query.orderAsc('chapterNumber')
+                ]);
+                let html = `<div style="padding:1rem;"><div class="story-title">${story.title}</div><div class="story-authors">By ${story.writers || story.creatorName}</div><div class="story-text dropcap">`;
+                chRes.documents.forEach(ch => {
+                    html += `<p class="session-label">Session ${ch.chapterNumber} — by ${ch.authorName}</p><p>${ch.content}</p>`;
                 });
-
-                storyHtml += `<p class="story-end">${story.status === 'completed' ? '🏁 The End' : '✍️ In Progress'} 
-                              <span class="share-mini" onclick="shareStory('${story.title.replace(/'/g, "\\'")}')">Share</span></p>
-                              </div></div>`;
-
-                // Split if too long
-                const maxChars = 2000;
-                if (storyHtml.length > maxChars) {
-                    let remaining = storyHtml;
-                    while (remaining.length > 0) {
-                        let splitIndex = remaining.indexOf('</p>', maxChars);
-                        if (splitIndex === -1) splitIndex = remaining.length;
-                        else splitIndex += 4;
-                        const chunk = remaining.substring(0, splitIndex);
-                        remaining = remaining.substring(splitIndex);
-                        newPages.push(`<div style="padding:1rem;">${chunk}</div>`);
-                    }
-                } else {
-                    newPages.push(storyHtml);
-                }
+                html += `<p class="story-end">${story.status === 'completed' ? '🏁 The End' : '✍️ In Progress'} <span class="share-mini" onclick="shareStory('${story.title.replace(/'/g, "\\'")}')">Share</span></p></div></div>`;
+                newPages.push(html);
             }
-
-            // Back cover
-            newPages.push(
-                `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;padding:1.5rem;">
-                    <div class="cover-title" style="font-size:1.5rem;">RelayTale</div>
-                    <div class="cover-divider"></div>
-                    <p style="font-size:0.8rem;color:var(--ink);margin-top:0.8rem;">Where Writers Create Stories By Turn</p>
-                    <p style="font-size:0.7rem;color:var(--accent);margin-top:1.5rem;">Published by RelayTale Press</p>
-                    <p style="font-size:0.65rem;color:var(--ink);margin-top:0.3rem;">rotulahiri@gmail.com</p>
-                    <p style="font-size:0.6rem;color:var(--accent);margin-top:1.5rem;">© 2026 RelayTale. All rights reserved.</p>
-                </div>`
-            );
-
+            newPages.push(`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;padding:1.5rem;">
+                <div class="cover-title" style="font-size:1.5rem;">RelayTale</div><p>Published by RelayTale Press</p>
+            </div>`);
             pages = newPages;
             currentPageIndex = 0;
             renderBook();
             fetchStatus.textContent = `✅ Loaded ${storiesRes.documents.length} stories!`;
         } catch (err) {
-            fetchStatus.textContent = '❌ Error fetching stories. Check console.';
+            fetchStatus.textContent = '❌ Error: ' + err.message;
             console.error(err);
         }
     };
 
-    // ==================== KEYBOARD & TOUCH ====================
     document.addEventListener('keydown', (e) => {
         if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); nextPage(); }
         if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); prevPage(); }
     });
-
     let touchStartX = 0;
     document.addEventListener('touchstart', (e) => { touchStartX = e.touches[0].clientX; });
     document.addEventListener('touchend', (e) => {
-        const diff = touchStartX - e.changedTouches[0].clientX;
-        if (Math.abs(diff) > 40) {
-            if (diff > 0) nextPage(); else prevPage();
+        if (Math.abs(touchStartX - e.changedTouches[0].clientX) > 40) {
+            touchStartX - e.changedTouches[0].clientX > 0 ? nextPage() : prevPage();
         }
     });
 
-    // ==================== INIT ====================
     renderBook();
 </script>
 </body>
