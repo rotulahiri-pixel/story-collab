@@ -7,63 +7,185 @@
     <script src="https://cdn.jsdelivr.net/npm/appwrite@13.0.2"></script>
     <style>
         :root {
-            --cream: #f5f0e8; --sepia: #e8dcc8; --ink: #2c2416; --accent: #8b4513; --gold: #b8860b;
+            --cream: #f5f0e8;
+            --sepia: #e8dcc8;
+            --ink: #2c2416;
+            --accent: #8b4513;
+            --gold: #b8860b;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             background: #2c1810;
             background-image: radial-gradient(ellipse at center, #4a2a1a 0%, #1a0c06 100%);
             font-family: 'Georgia', 'Times New Roman', serif;
-            display: flex; align-items: center; justify-content: center;
-            min-height: 100vh; padding: 0.5rem;
-            user-select: none; -webkit-user-select: none; overflow-x: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 0.5rem;
+            user-select: none;
+            -webkit-user-select: none;
+            overflow-x: hidden;
         }
-        .app-container { width: 100%; max-width: 400px; display: flex; flex-direction: column; align-items: center; }
+        .app-container {
+            width: 100%;
+            max-width: 400px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* Morocco leather cover styling */
         .book-spine {
-            position: absolute; top: 0; left: -18px; bottom: 0; width: 18px;
-            background: linear-gradient(to right, #3c2415, #5a3a2a, #3c2415);
-            border-radius: 4px 0 0 4px; box-shadow: inset -2px 0 4px rgba(0,0,0,0.5); z-index: 5;
+            position: absolute;
+            top: 0; left: -22px; bottom: 0; width: 22px;
+            background: linear-gradient(to right, #3c1e0f, #5a2d1a, #3c1e0f);
+            border-radius: 5px 0 0 5px;
+            box-shadow: inset -2px 0 4px rgba(0,0,0,0.5);
+            z-index: 5;
         }
-        .book-flip-container { position: relative; width: 100%; perspective: 1500px; padding-bottom: 150%; }
+        .book-flip-container {
+            position: relative;
+            width: 100%;
+            perspective: 1500px;
+            padding-bottom: 150%;  /* tall portrait */
+        }
         .page {
-            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-            background: var(--cream); border-radius: 0 6px 6px 0;
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: var(--cream);
+            border-radius: 0 6px 6px 0;
             box-shadow: 0 4px 20px rgba(0,0,0,0.5), inset 0 0 30px rgba(139,69,19,0.05);
             transform-origin: left center;
             transition: transform 0.7s cubic-bezier(0.645, 0.045, 0.355, 1);
-            backface-visibility: hidden; overflow: hidden; display: flex; flex-direction: column;
+            backface-visibility: hidden;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
         }
         .page.flipped { transform: rotateY(-180deg); }
-        .page-content { flex: 1; padding: 1.2rem 1rem; overflow-y: auto; font-size: 0.9rem; line-height: 1.6; color: var(--ink); }
-        .page-number { text-align: center; font-size: 0.7rem; color: var(--accent); padding: 0.4rem; border-top: 1px solid var(--sepia); background: var(--cream); }
-        .nav-bar { display: flex; align-items: center; gap: 1rem; margin-top: 1rem; flex-wrap: wrap; justify-content: center; }
+        .page-content {
+            flex: 1;
+            padding: 1.2rem 1rem;
+            overflow-y: auto;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: var(--ink);
+            -webkit-overflow-scrolling: touch;
+        }
+        .page-number {
+            text-align: center;
+            font-size: 0.7rem;
+            color: var(--accent);
+            padding: 0.4rem;
+            border-top: 1px solid var(--sepia);
+            background: var(--cream);
+        }
+
+        /* Cover gold corners */
+        .cover-page {
+            position: relative;
+            background: linear-gradient(135deg, #5a2d1a 0%, #3c1e0f 40%, #2a1005 100%);
+            border-radius: 0 6px 6px 0;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            overflow: hidden;
+        }
+        .cover-page::before,
+        .cover-page::after,
+        .cover-page .corner-tl,
+        .cover-page .corner-br {
+            position: absolute;
+            width: 40px; height: 40px;
+            border: 3px solid var(--gold);
+            z-index: 2;
+        }
+        .cover-page::before { top: 8px; left: 8px; border-right: none; border-bottom: none; }
+        .cover-page::after { bottom: 8px; right: 8px; border-left: none; border-top: none; }
+        .cover-page .corner-tr { top: 8px; right: 8px; border-left: none; border-bottom: none; }
+        .cover-page .corner-bl { bottom: 8px; left: 8px; border-right: none; border-top: none; }
+
+        .cover-title {
+            font-size: 2.2rem;
+            font-weight: bold;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            color: var(--gold);
+            text-shadow: 2px 2px 0 rgba(0,0,0,0.5);
+            margin-bottom: 0.5rem;
+        }
+        .cover-subtitle {
+            font-size: 0.8rem;
+            font-style: italic;
+            color: var(--cream);
+            letter-spacing: 2px;
+        }
+        .cover-divider {
+            width: 50%;
+            margin: 1rem auto;
+            border-top: 2px double var(--gold);
+        }
+
+        /* Navigation */
+        .nav-bar {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-top: 1rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
         .nav-btn {
-            background: var(--cream); color: var(--ink); border: 2px solid var(--accent);
-            padding: 0.6rem 1.2rem; font-family: 'Georgia', serif; font-size: 0.9rem;
-            cursor: pointer; border-radius: 4px; letter-spacing: 1px; transition: all 0.3s; min-width: 80px; text-align: center;
+            background: var(--cream);
+            color: var(--ink);
+            border: 2px solid var(--accent);
+            padding: 0.6rem 1.2rem;
+            font-family: 'Georgia', serif;
+            font-size: 0.9rem;
+            cursor: pointer;
+            border-radius: 4px;
+            letter-spacing: 1px;
+            transition: all 0.3s;
+            min-width: 80px;
+            text-align: center;
         }
         .nav-btn:hover { background: var(--accent); color: var(--cream); }
         .nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-        .page-indicator { color: var(--cream); font-family: 'Georgia', serif; font-size: 0.85rem; letter-spacing: 2px; margin-top: 0.5rem; text-align: center; }
+        .page-indicator {
+            color: var(--cream);
+            font-family: 'Georgia', serif;
+            font-size: 0.85rem;
+            letter-spacing: 2px;
+            margin-top: 0.5rem;
+            text-align: center;
+        }
         .fetch-btn {
-            background: var(--gold); color: var(--ink); border: 2px solid var(--accent);
-            padding: 0.5rem 1rem; font-family: 'Georgia', serif; font-size: 0.85rem;
-            cursor: pointer; border-radius: 4px; margin-top: 0.8rem; letter-spacing: 1px;
+            background: var(--gold);
+            color: var(--ink);
+            border: 2px solid var(--accent);
+            padding: 0.5rem 1rem;
+            font-family: 'Georgia', serif;
+            font-size: 0.85rem;
+            cursor: pointer;
+            border-radius: 4px;
+            margin-top: 0.8rem;
+            letter-spacing: 1px;
         }
         .fetch-btn:hover { background: var(--accent); color: var(--cream); }
-        .fetch-status { color: var(--cream); font-size: 0.8rem; margin-top: 0.3rem; text-align: center; font-style: italic; }
-        .magazine-title { font-size: 1.6rem; font-weight: bold; letter-spacing: 2px; text-transform: uppercase; color: var(--ink); text-align: center; margin-bottom: 0.4rem; }
-        .magazine-subtitle { font-size: 0.75rem; font-style: italic; text-align: center; color: var(--accent); letter-spacing: 1px; margin-bottom: 0.8rem; }
+        .fetch-status {
+            color: var(--cream);
+            font-size: 0.8rem;
+            margin-top: 0.3rem;
+            text-align: center;
+            font-style: italic;
+        }
+
+        /* Typography inside pages */
         .story-title { font-size: 1.1rem; font-weight: bold; color: var(--ink); margin-bottom: 0.2rem; }
         .story-authors { font-size: 0.7rem; font-style: italic; color: var(--accent); margin-bottom: 0.6rem; }
-        .story-text { font-size: 0.85rem; line-height: 1.6; color: var(--ink); text-align: justify; }
-        .story-text p { margin-bottom: 0.6rem; }
-        .dropcap::first-letter { float: left; font-size: 2.8rem; line-height: 0.8; padding-right: 0.3rem; color: var(--accent); font-weight: bold; }
+        .story-text { font-size: 0.85rem; line-height: 1.6; color: var(--ink); text-align: justify; white-space: pre-wrap; }
         .session-label { font-style: italic; color: var(--accent); font-size: 0.75rem; margin-bottom: 0.2rem; }
         .story-end { text-align: center; font-style: italic; color: var(--accent); margin-top: 0.4rem; font-size: 0.8rem; }
         .share-mini { font-size: 0.7rem; color: var(--accent); cursor: pointer; text-decoration: underline; margin-left: 0.5rem; }
-        .cover-title { font-size: 2rem; font-weight: bold; letter-spacing: 4px; text-align: center; color: var(--gold); text-shadow: 2px 2px 0 rgba(0,0,0,0.3); margin: 1rem 0; }
-        .cover-divider { width: 60%; margin: 0.8rem auto; border-top: 2px double var(--gold); }
     </style>
 </head>
 <body>
@@ -72,47 +194,131 @@
         <div class="book-spine"></div>
         <div class="book-flip-container" id="flipContainer"></div>
     </div>
+
     <div class="nav-bar">
         <button class="nav-btn" id="prevBtn" onclick="prevPage()">◀ Prev</button>
         <button class="nav-btn" id="nextBtn" onclick="nextPage()">Next ▶</button>
     </div>
     <div class="page-indicator" id="pageIndicator">Cover</div>
+
     <button class="fetch-btn" onclick="fetchLiveStories()">📡 Fetch Stories from Appwrite</button>
     <div class="fetch-status" id="fetchStatus"></div>
 </div>
 
 <script>
-    // ===== REPLACE WITH YOUR REAL PROJECT ID =====
+    // ===== CONFIGURATION =====
     const PROJECT_ID = 'rotulahiri';   // ← CHANGE THIS
     const DATABASE_ID = 'stories_db';
     const STORIES_COLLECTION = 'stories';
     const CHAPTERS_COLLECTION = 'chapters';
     const ENDPOINT = 'https://fra.cloud.appwrite.io/v1';
 
-    // Sample offline pages
-    const samplePages = [
-        `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;padding:1.5rem;">
-            <div style="font-size:0.8rem;letter-spacing:3px;color:var(--accent);margin-bottom:0.8rem;">A MONTHLY COLLECTION</div>
-            <div class="cover-title">RelayTale</div><div class="cover-divider"></div>
-            <div class="magazine-subtitle">Where Writers Create Stories By Turn</div>
-            <div style="margin-top:1.5rem;font-size:0.8rem;letter-spacing:2px;color:var(--accent);">SAMPLE ISSUE</div>
-        </div>`,
-        `<div style="padding:1rem;"><div class="story-title">Sample Story</div><div class="story-authors">By Sample Author</div><div class="story-text"><p>This is a sample. Fetch real stories from Appwrite.</p></div></div>`
-    ];
+    // Pagination settings
+    const MAX_CHARS_PER_PAGE = 1400;        // Approximate characters per page
+    const ORPHAN_MIN_CHARS = 150;           // Min chars to avoid orphan lines
 
-    let pages = [...samplePages];
+    // ===== STATE =====
+    let pages = [createCoverPage('Sample Cover', 'Sample Issue')];  // Start with a cover
     let currentPageIndex = 0;
+
     const flipContainer = document.getElementById('flipContainer');
     const prevBtn = document.getElementById('prevBtn');
     const nextBtn = document.getElementById('nextBtn');
     const pageIndicator = document.getElementById('pageIndicator');
     const fetchStatus = document.getElementById('fetchStatus');
 
+    // ===== COVER PAGE GENERATOR =====
+    function createCoverPage(title, subtitle) {
+        return `
+            <div class="cover-page" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;padding:1.5rem;">
+                <span class="corner-tl"></span><span class="corner-tr"></span><span class="corner-bl"></span><span class="corner-br"></span>
+                <div class="cover-title">${title}</div>
+                <div class="cover-divider"></div>
+                <div class="cover-subtitle">Where Writers Create Stories By Turn</div>
+                <div style="margin-top:2rem;font-size:0.8rem;color:var(--cream);letter-spacing:2px;">${subtitle}</div>
+            </div>`;
+    }
+
+    // ===== PAGINATION ENGINE =====
+    function paginateStory(story, chapters) {
+        const pagesForStory = [];
+        // Title page
+        pagesForStory.push(`
+            <div style="padding:1rem;">
+                <div class="story-title">${story.title}</div>
+                <div class="story-authors">By ${story.writers || story.creatorName}</div>
+            </div>`);
+
+        let currentPageContent = '';
+        let currentPageChars = 0;
+
+        // Build full text with session labels
+        let fullText = '';
+        chapters.forEach(ch => {
+            fullText += `<p class="session-label">Session ${ch.chapterNumber} — by ${ch.authorName}</p>\n`;
+            fullText += ch.content + '\n\n';
+        });
+
+        // Split into paragraphs (separated by double newlines or <p> tags)
+        const paragraphs = fullText.split(/\n{2,}/);
+        const cleanedParagraphs = paragraphs.filter(p => p.trim() !== '');
+
+        for (const para of cleanedParagraphs) {
+            const paraChars = para.length;
+            // If paragraph fits on current page, add it
+            if (currentPageChars + paraChars <= MAX_CHARS_PER_PAGE) {
+                if (currentPageContent) currentPageContent += '\n\n';
+                currentPageContent += para;
+                currentPageChars += paraChars;
+            } else {
+                // Paragraph too large – split into words
+                const words = para.split(/\s+/);
+                let chunk = '';
+                let chunkChars = 0;
+                for (const word of words) {
+                    if (chunkChars + word.length + 1 > MAX_CHARS_PER_PAGE && chunkChars > 0) {
+                        // Save current page and start new
+                        if (currentPageContent) currentPageContent += '\n\n' + chunk;
+                        else currentPageContent = chunk;
+                        pagesForStory.push(`<div style="padding:1rem;"><div class="story-text">${currentPageContent}</div></div>`);
+                        currentPageContent = '';
+                        currentPageChars = 0;
+                        chunk = word;
+                        chunkChars = word.length;
+                    } else {
+                        chunk += (chunk ? ' ' : '') + word;
+                        chunkChars += word.length + (chunk ? 1 : 0);
+                    }
+                }
+                // Remaining chunk after loop
+                if (chunk) {
+                    if (currentPageContent) currentPageContent += '\n\n' + chunk;
+                    else currentPageContent = chunk;
+                    currentPageChars += chunkChars;
+                }
+            }
+        }
+
+        // Final page
+        if (currentPageContent) {
+            pagesForStory.push(`<div style="padding:1rem;"><div class="story-text">${currentPageContent}</div></div>`);
+        }
+
+        // Add end marker and share to last page
+        const lastIdx = pagesForStory.length - 1;
+        const endHtml = `<p class="story-end">${story.status === 'completed' ? '🏁 The End' : '✍️ In Progress'} <span class="share-mini" onclick="shareStory('${story.title.replace(/'/g, "\\'")}')">Share</span></p>`;
+        pagesForStory[lastIdx] = pagesForStory[lastIdx].replace('</div></div>', `${endHtml}</div></div>`);
+
+        return pagesForStory;
+    }
+
+    // ===== BUILD ALL PAGES =====
     function renderBook() {
         flipContainer.innerHTML = '';
         for (let i = pages.length - 1; i >= 0; i--) {
             const pageDiv = document.createElement('div');
             pageDiv.className = 'page';
+            if (i === 0 || i === pages.length - 1) pageDiv.classList.add('cover-page'); // cover styling for first and last
             pageDiv.dataset.index = i;
             pageDiv.style.zIndex = pages.length - i;
             const contentDiv = document.createElement('div');
@@ -136,6 +342,7 @@
             updateNav();
         }
     }
+
     function prevPage() {
         if (currentPageIndex > 0) {
             currentPageIndex--;
@@ -143,12 +350,14 @@
             updateNav();
         }
     }
+
     function updateNav() {
         prevBtn.disabled = currentPageIndex === 0;
         nextBtn.disabled = currentPageIndex === pages.length - 1;
         pageIndicator.textContent = currentPageIndex === 0 ? 'Cover' : currentPageIndex === pages.length - 1 ? 'Back Cover' : `Page ${currentPageIndex + 1} of ${pages.length}`;
     }
 
+    // ===== SHARE =====
     window.shareStory = function(title) {
         const url = window.location.href;
         const text = `Read "${title}" from RelayTale Monthly.`;
@@ -158,9 +367,10 @@
         }
     };
 
+    // ===== FETCH FROM APPWRITE =====
     window.fetchLiveStories = async function() {
         if (PROJECT_ID === 'YOUR_PROJECT_ID') {
-            alert('Please replace YOUR_PROJECT_ID with your real Appwrite Project ID in the code.');
+            alert('Please replace YOUR_PROJECT_ID with your real Appwrite Project ID.');
             return;
         }
         fetchStatus.textContent = 'Fetching...';
@@ -173,25 +383,25 @@
                 fetchStatus.textContent = 'No stories found.';
                 return;
             }
+
             const newPages = [];
-            newPages.push(`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;padding:1.5rem;">
-                <div class="cover-title">RelayTale</div><div class="cover-divider"></div>
-                <div style="margin-top:1rem;">Featuring:<br>${storiesRes.documents.map(s => s.title).join(' • ')}</div>
-            </div>`);
+            // Cover page
+            const coverSubtitle = `Featuring: ${storiesRes.documents.map(s => s.title).join(' • ')}`;
+            newPages.push(createCoverPage('RelayTale', coverSubtitle));
+
+            // For each story, paginate
             for (const story of storiesRes.documents) {
                 const chRes = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, [
-                    Appwrite.Query.equal('storyId', story.$id), Appwrite.Query.orderAsc('chapterNumber')
+                    Appwrite.Query.equal('storyId', story.$id),
+                    Appwrite.Query.orderAsc('chapterNumber')
                 ]);
-                let html = `<div style="padding:1rem;"><div class="story-title">${story.title}</div><div class="story-authors">By ${story.writers || story.creatorName}</div><div class="story-text dropcap">`;
-                chRes.documents.forEach(ch => {
-                    html += `<p class="session-label">Session ${ch.chapterNumber} — by ${ch.authorName}</p><p>${ch.content}</p>`;
-                });
-                html += `<p class="story-end">${story.status === 'completed' ? '🏁 The End' : '✍️ In Progress'} <span class="share-mini" onclick="shareStory('${story.title.replace(/'/g, "\\'")}')">Share</span></p></div></div>`;
-                newPages.push(html);
+                const storyPages = paginateStory(story, chRes.documents);
+                newPages.push(...storyPages);
             }
-            newPages.push(`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;padding:1.5rem;">
-                <div class="cover-title" style="font-size:1.5rem;">RelayTale</div><p>Published by RelayTale Press</p>
-            </div>`);
+
+            // Back cover
+            newPages.push(createCoverPage('RelayTale', 'Published by RelayTale Press'));
+
             pages = newPages;
             currentPageIndex = 0;
             renderBook();
@@ -202,18 +412,30 @@
         }
     };
 
+    // ===== STABLE PAGE FLIP (no accidental flips) =====
+    let touchStartX = 0, touchStartY = 0;
+    document.addEventListener('touchstart', (e) => {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+
+    document.addEventListener('touchend', (e) => {
+        const dx = touchStartX - e.changedTouches[0].clientX;
+        const dy = touchStartY - e.changedTouches[0].clientY;
+        // Only flip if horizontal swipe is dominant and exceeds threshold
+        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
+            if (dx > 0) nextPage();
+            else prevPage();
+        }
+    });
+
+    // Keyboard navigation
     document.addEventListener('keydown', (e) => {
         if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); nextPage(); }
         if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); prevPage(); }
     });
-    let touchStartX = 0;
-    document.addEventListener('touchstart', (e) => { touchStartX = e.touches[0].clientX; });
-    document.addEventListener('touchend', (e) => {
-        if (Math.abs(touchStartX - e.changedTouches[0].clientX) > 40) {
-            touchStartX - e.changedTouches[0].clientX > 0 ? nextPage() : prevPage();
-        }
-    });
 
+    // ===== INIT =====
     renderBook();
 </script>
 </body>
