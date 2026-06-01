@@ -25,17 +25,26 @@
             padding: 0.5rem;
             user-select: none;
             -webkit-user-select: none;
-            overflow-x: hidden;
+            overflow: hidden;
         }
         .app-container {
             width: 100%;
-            max-width: 400px;
+            max-width: 420px;
             display: flex;
             flex-direction: column;
             align-items: center;
+            height: 100vh;
+            justify-content: space-between;
         }
-
-        /* Morocco leather cover styling */
+        .book-wrapper {
+            position: relative;
+            width: 100%;
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
         .book-spine {
             position: absolute;
             top: 0; left: -22px; bottom: 0; width: 22px;
@@ -47,8 +56,9 @@
         .book-flip-container {
             position: relative;
             width: 100%;
+            height: 100%;
             perspective: 1500px;
-            padding-bottom: 150%;  /* tall portrait */
+            max-height: 70vh;
         }
         .page {
             position: absolute;
@@ -82,18 +92,25 @@
             background: var(--cream);
         }
 
-        /* Cover gold corners */
+        /* Morocco leather cover */
         .cover-page {
-            position: relative;
             background: linear-gradient(135deg, #5a2d1a 0%, #3c1e0f 40%, #2a1005 100%);
             border-radius: 0 6px 6px 0;
             box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            text-align: center;
+            padding-top: 25%;
+            position: relative;
+            height: 100%;
+            color: var(--cream);
         }
         .cover-page::before,
         .cover-page::after,
-        .cover-page .corner-tl,
-        .cover-page .corner-br {
+        .cover-page .corner-tr,
+        .cover-page .corner-bl {
             position: absolute;
             width: 40px; height: 40px;
             border: 3px solid var(--gold);
@@ -105,7 +122,7 @@
         .cover-page .corner-bl { bottom: 8px; left: 8px; border-right: none; border-top: none; }
 
         .cover-title {
-            font-size: 2.2rem;
+            font-size: 2.8rem;
             font-weight: bold;
             letter-spacing: 4px;
             text-transform: uppercase;
@@ -125,12 +142,32 @@
             border-top: 2px double var(--gold);
         }
 
+        /* Story title page (centered, 1/4 from top) */
+        .story-title-page {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            text-align: center;
+            padding-top: 25%;
+            height: 100%;
+            color: var(--ink);
+            background: var(--cream);
+        }
+        .story-title-main {
+            font-size: 2rem;
+            font-weight: bold;
+            letter-spacing: 1px;
+            max-width: 90%;
+            margin-bottom: 0.5rem;
+        }
+
         /* Navigation */
         .nav-bar {
             display: flex;
             align-items: center;
             gap: 1rem;
-            margin-top: 1rem;
+            margin: 0.5rem 0;
             flex-wrap: wrap;
             justify-content: center;
         }
@@ -155,7 +192,7 @@
             font-family: 'Georgia', serif;
             font-size: 0.85rem;
             letter-spacing: 2px;
-            margin-top: 0.5rem;
+            margin-bottom: 0.5rem;
             text-align: center;
         }
         .fetch-btn {
@@ -167,21 +204,20 @@
             font-size: 0.85rem;
             cursor: pointer;
             border-radius: 4px;
-            margin-top: 0.8rem;
             letter-spacing: 1px;
+            margin-bottom: 0.5rem;
         }
         .fetch-btn:hover { background: var(--accent); color: var(--cream); }
         .fetch-status {
             color: var(--cream);
             font-size: 0.8rem;
-            margin-top: 0.3rem;
+            margin-bottom: 0.3rem;
             text-align: center;
             font-style: italic;
         }
 
-        /* Typography inside pages */
-        .story-title { font-size: 1.1rem; font-weight: bold; color: var(--ink); margin-bottom: 0.2rem; }
-        .story-authors { font-size: 0.7rem; font-style: italic; color: var(--accent); margin-bottom: 0.6rem; }
+        /* Typography */
+        .story-authors { font-size: 0.7rem; font-style: italic; color: var(--accent); margin-top: 0.5rem; }
         .story-text { font-size: 0.85rem; line-height: 1.6; color: var(--ink); text-align: justify; white-space: pre-wrap; }
         .session-label { font-style: italic; color: var(--accent); font-size: 0.75rem; margin-bottom: 0.2rem; }
         .story-end { text-align: center; font-style: italic; color: var(--accent); margin-top: 0.4rem; font-size: 0.8rem; }
@@ -190,7 +226,7 @@
 </head>
 <body>
 <div class="app-container">
-    <div style="position:relative; width:100%;">
+    <div class="book-wrapper">
         <div class="book-spine"></div>
         <div class="book-flip-container" id="flipContainer"></div>
     </div>
@@ -212,13 +248,15 @@
     const STORIES_COLLECTION = 'stories';
     const CHAPTERS_COLLECTION = 'chapters';
     const ENDPOINT = 'https://fra.cloud.appwrite.io/v1';
+    const EMAIL = 'relaytale@gmail.com';
 
-    // Pagination settings
-    const MAX_CHARS_PER_PAGE = 1400;        // Approximate characters per page
-    const ORPHAN_MIN_CHARS = 150;           // Min chars to avoid orphan lines
+    const MAX_CHARS_PER_PAGE = 1300;
+    const ORPHAN_MIN_CHARS = 150;
 
     // ===== STATE =====
-    let pages = [createCoverPage('Sample Cover', 'Sample Issue')];  // Start with a cover
+    let pages = [
+        { html: createCoverPage('RelayTale', 'Sample Issue'), isCover: true }
+    ];
     let currentPageIndex = 0;
 
     const flipContainer = document.getElementById('flipContainer');
@@ -230,57 +268,54 @@
     // ===== COVER PAGE GENERATOR =====
     function createCoverPage(title, subtitle) {
         return `
-            <div class="cover-page" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;padding:1.5rem;">
+            <div class="cover-page">
                 <span class="corner-tl"></span><span class="corner-tr"></span><span class="corner-bl"></span><span class="corner-br"></span>
                 <div class="cover-title">${title}</div>
                 <div class="cover-divider"></div>
                 <div class="cover-subtitle">Where Writers Create Stories By Turn</div>
-                <div style="margin-top:2rem;font-size:0.8rem;color:var(--cream);letter-spacing:2px;">${subtitle}</div>
+                <div style="margin-top:2rem;font-size:0.8rem;letter-spacing:2px;">${subtitle}</div>
+                <div style="margin-top:1rem;font-size:0.7rem;">${EMAIL}</div>
             </div>`;
     }
 
-    // ===== PAGINATION ENGINE =====
+    // ===== STORY TITLE PAGE GENERATOR =====
+    function createStoryTitlePage(story) {
+        return `
+            <div class="story-title-page">
+                <div class="story-title-main">${story.title}</div>
+                <div class="story-authors">By ${story.writers || story.creatorName}</div>
+            </div>`;
+    }
+
+    // ===== PAGINATION =====
     function paginateStory(story, chapters) {
         const pagesForStory = [];
-        // Title page
-        pagesForStory.push(`
-            <div style="padding:1rem;">
-                <div class="story-title">${story.title}</div>
-                <div class="story-authors">By ${story.writers || story.creatorName}</div>
-            </div>`);
+        // Story title page (centered, 1/4 from top)
+        pagesForStory.push({ html: createStoryTitlePage(story), isStoryTitle: true });
 
         let currentPageContent = '';
         let currentPageChars = 0;
-
-        // Build full text with session labels
         let fullText = '';
         chapters.forEach(ch => {
             fullText += `<p class="session-label">Session ${ch.chapterNumber} — by ${ch.authorName}</p>\n`;
             fullText += ch.content + '\n\n';
         });
 
-        // Split into paragraphs (separated by double newlines or <p> tags)
-        const paragraphs = fullText.split(/\n{2,}/);
-        const cleanedParagraphs = paragraphs.filter(p => p.trim() !== '');
-
-        for (const para of cleanedParagraphs) {
+        const paragraphs = fullText.split(/\n{2,}/).filter(p => p.trim());
+        for (const para of paragraphs) {
             const paraChars = para.length;
-            // If paragraph fits on current page, add it
             if (currentPageChars + paraChars <= MAX_CHARS_PER_PAGE) {
-                if (currentPageContent) currentPageContent += '\n\n';
-                currentPageContent += para;
+                currentPageContent += (currentPageContent ? '\n\n' : '') + para;
                 currentPageChars += paraChars;
             } else {
-                // Paragraph too large – split into words
                 const words = para.split(/\s+/);
                 let chunk = '';
                 let chunkChars = 0;
                 for (const word of words) {
                     if (chunkChars + word.length + 1 > MAX_CHARS_PER_PAGE && chunkChars > 0) {
-                        // Save current page and start new
                         if (currentPageContent) currentPageContent += '\n\n' + chunk;
                         else currentPageContent = chunk;
-                        pagesForStory.push(`<div style="padding:1rem;"><div class="story-text">${currentPageContent}</div></div>`);
+                        pagesForStory.push({ html: `<div style="padding:1rem;"><div class="story-text">${currentPageContent}</div></div>` });
                         currentPageContent = '';
                         currentPageChars = 0;
                         chunk = word;
@@ -290,7 +325,6 @@
                         chunkChars += word.length + (chunk ? 1 : 0);
                     }
                 }
-                // Remaining chunk after loop
                 if (chunk) {
                     if (currentPageContent) currentPageContent += '\n\n' + chunk;
                     else currentPageContent = chunk;
@@ -298,16 +332,14 @@
                 }
             }
         }
-
-        // Final page
         if (currentPageContent) {
-            pagesForStory.push(`<div style="padding:1rem;"><div class="story-text">${currentPageContent}</div></div>`);
+            pagesForStory.push({ html: `<div style="padding:1rem;"><div class="story-text">${currentPageContent}</div></div>` });
         }
 
-        // Add end marker and share to last page
+        // Add end marker and share to last text page
         const lastIdx = pagesForStory.length - 1;
         const endHtml = `<p class="story-end">${story.status === 'completed' ? '🏁 The End' : '✍️ In Progress'} <span class="share-mini" onclick="shareStory('${story.title.replace(/'/g, "\\'")}')">Share</span></p>`;
-        pagesForStory[lastIdx] = pagesForStory[lastIdx].replace('</div></div>', `${endHtml}</div></div>`);
+        pagesForStory[lastIdx].html = pagesForStory[lastIdx].html.replace('</div></div>', `${endHtml}</div></div>`);
 
         return pagesForStory;
     }
@@ -316,19 +348,28 @@
     function renderBook() {
         flipContainer.innerHTML = '';
         for (let i = pages.length - 1; i >= 0; i--) {
+            const pageData = pages[i];
             const pageDiv = document.createElement('div');
             pageDiv.className = 'page';
-            if (i === 0 || i === pages.length - 1) pageDiv.classList.add('cover-page'); // cover styling for first and last
             pageDiv.dataset.index = i;
             pageDiv.style.zIndex = pages.length - i;
+
             const contentDiv = document.createElement('div');
             contentDiv.className = 'page-content';
-            contentDiv.innerHTML = pages[i];
+
+            // Remove padding for cover and story title pages
+            if (pageData.isCover || pageData.isStoryTitle) {
+                contentDiv.style.padding = '0';
+            }
+            contentDiv.innerHTML = pageData.html;
+
             const pageNum = document.createElement('div');
             pageNum.className = 'page-number';
             pageNum.textContent = i + 1;
+
             pageDiv.appendChild(contentDiv);
             pageDiv.appendChild(pageNum);
+
             if (i < currentPageIndex) pageDiv.classList.add('flipped');
             flipContainer.appendChild(pageDiv);
         }
@@ -342,7 +383,6 @@
             updateNav();
         }
     }
-
     function prevPage() {
         if (currentPageIndex > 0) {
             currentPageIndex--;
@@ -350,7 +390,6 @@
             updateNav();
         }
     }
-
     function updateNav() {
         prevBtn.disabled = currentPageIndex === 0;
         nextBtn.disabled = currentPageIndex === pages.length - 1;
@@ -385,11 +424,9 @@
             }
 
             const newPages = [];
-            // Cover page
             const coverSubtitle = `Featuring: ${storiesRes.documents.map(s => s.title).join(' • ')}`;
-            newPages.push(createCoverPage('RelayTale', coverSubtitle));
+            newPages.push({ html: createCoverPage('RelayTale', coverSubtitle), isCover: true });
 
-            // For each story, paginate
             for (const story of storiesRes.documents) {
                 const chRes = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, [
                     Appwrite.Query.equal('storyId', story.$id),
@@ -399,8 +436,7 @@
                 newPages.push(...storyPages);
             }
 
-            // Back cover
-            newPages.push(createCoverPage('RelayTale', 'Published by RelayTale Press'));
+            newPages.push({ html: createCoverPage('RelayTale', 'Published by RelayTale Press'), isCover: true });
 
             pages = newPages;
             currentPageIndex = 0;
@@ -412,24 +448,20 @@
         }
     };
 
-    // ===== STABLE PAGE FLIP (no accidental flips) =====
+    // ===== STABLE PAGE FLIP =====
     let touchStartX = 0, touchStartY = 0;
     document.addEventListener('touchstart', (e) => {
         touchStartX = e.touches[0].clientX;
         touchStartY = e.touches[0].clientY;
     }, { passive: true });
-
     document.addEventListener('touchend', (e) => {
         const dx = touchStartX - e.changedTouches[0].clientX;
         const dy = touchStartY - e.changedTouches[0].clientY;
-        // Only flip if horizontal swipe is dominant and exceeds threshold
         if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
             if (dx > 0) nextPage();
             else prevPage();
         }
     });
-
-    // Keyboard navigation
     document.addEventListener('keydown', (e) => {
         if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); nextPage(); }
         if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); prevPage(); }
