@@ -102,7 +102,7 @@
             align-items: center;
             justify-content: flex-start;
             text-align: center;
-            padding-top: 25%;
+            padding-top: 20%;
             position: relative;
             height: 100%;
             color: var(--cream);
@@ -142,7 +142,7 @@
             border-top: 2px double var(--gold);
         }
 
-        /* Story title page (centered, 1/4 from top) */
+        /* Story title page */
         .story-title-page {
             display: flex;
             flex-direction: column;
@@ -195,23 +195,26 @@
             margin-bottom: 0.5rem;
             text-align: center;
         }
-        .fetch-btn {
+
+        /* Fetch button on cover */
+        .cover-fetch-btn {
             background: var(--gold);
             color: var(--ink);
             border: 2px solid var(--accent);
             padding: 0.5rem 1rem;
             font-family: 'Georgia', serif;
-            font-size: 0.85rem;
+            font-size: 0.9rem;
             cursor: pointer;
             border-radius: 4px;
             letter-spacing: 1px;
-            margin-bottom: 0.5rem;
+            margin-top: auto;
+            margin-bottom: 1.5rem;
         }
-        .fetch-btn:hover { background: var(--accent); color: var(--cream); }
+        .cover-fetch-btn:hover { background: var(--accent); color: var(--cream); }
         .fetch-status {
             color: var(--cream);
             font-size: 0.8rem;
-            margin-bottom: 0.3rem;
+            margin-top: 0.5rem;
             text-align: center;
             font-style: italic;
         }
@@ -236,9 +239,6 @@
         <button class="nav-btn" id="nextBtn" onclick="nextPage()">Next ▶</button>
     </div>
     <div class="page-indicator" id="pageIndicator">Cover</div>
-
-    <button class="fetch-btn" onclick="fetchLiveStories()">📡 Fetch Stories from Appwrite</button>
-    <div class="fetch-status" id="fetchStatus"></div>
 </div>
 
 <script>
@@ -251,11 +251,10 @@
     const EMAIL = 'relaytale@gmail.com';
 
     const MAX_CHARS_PER_PAGE = 1300;
-    const ORPHAN_MIN_CHARS = 150;
 
     // ===== STATE =====
     let pages = [
-        { html: createCoverPage('RelayTale', 'Sample Issue'), isCover: true }
+        { html: createCoverPage('RelayTale', 'Sample Issue', true), isCover: true }
     ];
     let currentPageIndex = 0;
 
@@ -263,10 +262,13 @@
     const prevBtn = document.getElementById('prevBtn');
     const nextBtn = document.getElementById('nextBtn');
     const pageIndicator = document.getElementById('pageIndicator');
-    const fetchStatus = document.getElementById('fetchStatus');
 
     // ===== COVER PAGE GENERATOR =====
-    function createCoverPage(title, subtitle) {
+    function createCoverPage(title, subtitle, includeFetch = false) {
+        const fetchHTML = includeFetch ? `
+            <button class="cover-fetch-btn" onclick="event.stopPropagation(); fetchLiveStories()">📡 Fetch Stories from Appwrite</button>
+            <div id="fetchStatusCover" class="fetch-status"></div>
+        ` : '';
         return `
             <div class="cover-page">
                 <span class="corner-tl"></span><span class="corner-tr"></span><span class="corner-bl"></span><span class="corner-br"></span>
@@ -275,10 +277,11 @@
                 <div class="cover-subtitle">Where Writers Create Stories By Turn</div>
                 <div style="margin-top:2rem;font-size:0.8rem;letter-spacing:2px;">${subtitle}</div>
                 <div style="margin-top:1rem;font-size:0.7rem;">${EMAIL}</div>
+                ${fetchHTML}
             </div>`;
     }
 
-    // ===== STORY TITLE PAGE GENERATOR =====
+    // ===== STORY TITLE PAGE =====
     function createStoryTitlePage(story) {
         return `
             <div class="story-title-page">
@@ -290,7 +293,6 @@
     // ===== PAGINATION =====
     function paginateStory(story, chapters) {
         const pagesForStory = [];
-        // Story title page (centered, 1/4 from top)
         pagesForStory.push({ html: createStoryTitlePage(story), isStoryTitle: true });
 
         let currentPageContent = '';
@@ -356,8 +358,6 @@
 
             const contentDiv = document.createElement('div');
             contentDiv.className = 'page-content';
-
-            // Remove padding for cover and story title pages
             if (pageData.isCover || pageData.isStoryTitle) {
                 contentDiv.style.padding = '0';
             }
@@ -412,20 +412,28 @@
             alert('Please replace YOUR_PROJECT_ID with your real Appwrite Project ID.');
             return;
         }
-        fetchStatus.textContent = 'Fetching...';
+        // Update status on cover (if present) or fallback to alert
+        const statusEl = document.getElementById('fetchStatusCover') || document.createElement('div');
+        if (!statusEl.id) {
+            document.body.appendChild(statusEl);
+            statusEl.id = 'fetchStatusCover';
+            statusEl.className = 'fetch-status';
+        }
+        statusEl.textContent = 'Fetching...';
         try {
             const client = new Appwrite.Client();
             client.setEndpoint(ENDPOINT).setProject(PROJECT_ID);
             const databases = new Appwrite.Databases(client);
             const storiesRes = await databases.listDocuments(DATABASE_ID, STORIES_COLLECTION);
             if (storiesRes.documents.length === 0) {
-                fetchStatus.textContent = 'No stories found.';
+                statusEl.textContent = 'No stories found.';
                 return;
             }
 
             const newPages = [];
             const coverSubtitle = `Featuring: ${storiesRes.documents.map(s => s.title).join(' • ')}`;
-            newPages.push({ html: createCoverPage('RelayTale', coverSubtitle), isCover: true });
+            // New front cover without fetch button
+            newPages.push({ html: createCoverPage('RelayTale', coverSubtitle, false), isCover: true });
 
             for (const story of storiesRes.documents) {
                 const chRes = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, [
@@ -436,14 +444,15 @@
                 newPages.push(...storyPages);
             }
 
-            newPages.push({ html: createCoverPage('RelayTale', 'Published by RelayTale Press'), isCover: true });
+            // Back cover
+            newPages.push({ html: createCoverPage('RelayTale', 'Published by RelayTale Press', false), isCover: true });
 
             pages = newPages;
             currentPageIndex = 0;
             renderBook();
-            fetchStatus.textContent = `✅ Loaded ${storiesRes.documents.length} stories!`;
+            statusEl.textContent = `✅ Loaded ${storiesRes.documents.length} stories!`;
         } catch (err) {
-            fetchStatus.textContent = '❌ Error: ' + err.message;
+            statusEl.textContent = '❌ Error: ' + err.message;
             console.error(err);
         }
     };
