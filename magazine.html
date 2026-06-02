@@ -222,9 +222,10 @@
         /* Typography */
         .story-authors { font-size: 0.7rem; font-style: italic; color: var(--accent); margin-top: 0.5rem; }
         .story-text { font-size: 0.85rem; line-height: 1.6; color: var(--ink); text-align: justify; white-space: pre-wrap; }
-        .session-label { font-style: italic; color: var(--accent); font-size: 0.75rem; margin-bottom: 0.2rem; }
+        .session-label { font-style: italic; color: var(--accent); font-size: 0.75rem; margin-bottom: 0.2rem; display: block; }
         .story-end { text-align: center; font-style: italic; color: var(--accent); margin-top: 0.4rem; font-size: 0.8rem; }
         .share-mini { font-size: 0.7rem; color: var(--accent); cursor: pointer; text-decoration: underline; margin-left: 0.5rem; }
+        .disclaimer-text { font-size: 0.7rem; color: var(--cream); line-height: 1.5; margin-top: 2rem; opacity: 0.8; }
     </style>
 </head>
 <body>
@@ -250,7 +251,11 @@
     const ENDPOINT = 'https://fra.cloud.appwrite.io/v1';
     const EMAIL = 'relaytale@gmail.com';
 
-    const MAX_CHARS_PER_PAGE = 1300;
+    const MAX_CHARS_PER_PAGE = 1200;   // slightly reduced to accommodate line breaks
+    const ORPHAN_MIN_CHARS = 80;       // minimum chars left on a page before forcing a break
+
+    // Disclaimer text for back cover
+    const DISCLAIMER = `Disclaimer: The creator of this app has no control over, and assumes no responsibility or liability for, any content, opinions, or views expressed by users on this platform. User‑generated content does not reflect the views of the creator, and all interactions and posts are the sole responsibility of the respective users. The Intellectual Property Rights of the collaborative effort will rest with the platform presently.`;
 
     // ===== STATE =====
     let pages = [
@@ -281,6 +286,20 @@
             </div>`;
     }
 
+    // ===== BACK COVER WITH DISCLAIMER =====
+    function createBackCover() {
+        return `
+            <div class="cover-page">
+                <span class="corner-tl"></span><span class="corner-tr"></span><span class="corner-bl"></span><span class="corner-br"></span>
+                <div class="cover-title" style="font-size:2rem;">RelayTale</div>
+                <div class="cover-divider"></div>
+                <div class="cover-subtitle">Where Writers Create Stories By Turn</div>
+                <div style="margin-top:1.5rem;font-size:0.8rem;letter-spacing:2px;">Published by RelayTale Press</div>
+                <div style="margin-top:0.5rem;font-size:0.7rem;">${EMAIL}</div>
+                <div class="disclaimer-text">${DISCLAIMER}</div>
+            </div>`;
+    }
+
     // ===== STORY TITLE PAGE =====
     function createStoryTitlePage(story) {
         return `
@@ -290,52 +309,55 @@
             </div>`;
     }
 
-    // ===== PAGINATION =====
+    // ===== IMPROVED PAGINATION =====
     function paginateStory(story, chapters) {
         const pagesForStory = [];
         pagesForStory.push({ html: createStoryTitlePage(story), isStoryTitle: true });
 
-        let currentPageContent = '';
-        let currentPageChars = 0;
+        // Build the full text with session labels and explicit newlines
         let fullText = '';
         chapters.forEach(ch => {
-            fullText += `<p class="session-label">Session ${ch.chapterNumber} — by ${ch.authorName}</p>\n`;
+            fullText += `<span class="session-label">Session ${ch.chapterNumber} — by ${ch.authorName}</span>\n`;
+            // Append content, preserving any existing line breaks (they are part of the string)
             fullText += ch.content + '\n\n';
         });
 
-        const paragraphs = fullText.split(/\n{2,}/).filter(p => p.trim());
-        for (const para of paragraphs) {
-            const paraChars = para.length;
-            if (currentPageChars + paraChars <= MAX_CHARS_PER_PAGE) {
-                currentPageContent += (currentPageContent ? '\n\n' : '') + para;
-                currentPageChars += paraChars;
+        // We'll work with the raw string, respecting whitespace.
+        // To split into pages, we tokenize by whitespace but keep newlines as separate tokens.
+        const tokens = fullText.match(/[^ \t\n]+|\n/g) || [];
+        let currentPage = '';
+        let currentLen = 0;
+
+        for (const token of tokens) {
+            if (token === '\n') {
+                // Always add newline characters (they consume almost no space)
+                currentPage += '\n';
+                continue;
+            }
+
+            const tokenLen = token.length;
+            // +1 for a space if not at the beginning of the page
+            const spaceNeeded = currentLen > 0 ? 1 : 0;
+
+            if (currentLen + spaceNeeded + tokenLen <= MAX_CHARS_PER_PAGE) {
+                if (currentLen > 0) currentPage += ' ';
+                currentPage += token;
+                currentLen += spaceNeeded + tokenLen;
             } else {
-                const words = para.split(/\s+/);
-                let chunk = '';
-                let chunkChars = 0;
-                for (const word of words) {
-                    if (chunkChars + word.length + 1 > MAX_CHARS_PER_PAGE && chunkChars > 0) {
-                        if (currentPageContent) currentPageContent += '\n\n' + chunk;
-                        else currentPageContent = chunk;
-                        pagesForStory.push({ html: `<div style="padding:1rem;"><div class="story-text">${currentPageContent}</div></div>` });
-                        currentPageContent = '';
-                        currentPageChars = 0;
-                        chunk = word;
-                        chunkChars = word.length;
-                    } else {
-                        chunk += (chunk ? ' ' : '') + word;
-                        chunkChars += word.length + (chunk ? 1 : 0);
-                    }
-                }
-                if (chunk) {
-                    if (currentPageContent) currentPageContent += '\n\n' + chunk;
-                    else currentPageContent = chunk;
-                    currentPageChars += chunkChars;
-                }
+                // Page is full; save it and start a new one
+                pagesForStory.push({ html: `<div style="padding:1rem;"><div class="story-text">${currentPage}</div></div>` });
+                currentPage = token;
+                currentLen = tokenLen;
             }
         }
-        if (currentPageContent) {
-            pagesForStory.push({ html: `<div style="padding:1rem;"><div class="story-text">${currentPageContent}</div></div>` });
+
+        // Don't leave a nearly empty page at the end – orphan control
+        if (currentLen > 0 && currentLen < ORPHAN_MIN_CHARS && pagesForStory.length > 0) {
+            // Append the remaining text to the last page
+            const lastPage = pagesForStory[pagesForStory.length - 1];
+            lastPage.html = lastPage.html.replace('</div></div>', ` ${currentPage}</div></div>`);
+        } else if (currentLen > 0) {
+            pagesForStory.push({ html: `<div style="padding:1rem;"><div class="story-text">${currentPage}</div></div>` });
         }
 
         // Add end marker and share to last text page
@@ -412,13 +434,7 @@
             alert('Please replace YOUR_PROJECT_ID with your real Appwrite Project ID.');
             return;
         }
-        // Update status on cover (if present) or fallback to alert
         const statusEl = document.getElementById('fetchStatusCover') || document.createElement('div');
-        if (!statusEl.id) {
-            document.body.appendChild(statusEl);
-            statusEl.id = 'fetchStatusCover';
-            statusEl.className = 'fetch-status';
-        }
         statusEl.textContent = 'Fetching...';
         try {
             const client = new Appwrite.Client();
@@ -432,7 +448,6 @@
 
             const newPages = [];
             const coverSubtitle = `Featuring: ${storiesRes.documents.map(s => s.title).join(' • ')}`;
-            // New front cover without fetch button
             newPages.push({ html: createCoverPage('RelayTale', coverSubtitle, false), isCover: true });
 
             for (const story of storiesRes.documents) {
@@ -444,8 +459,8 @@
                 newPages.push(...storyPages);
             }
 
-            // Back cover
-            newPages.push({ html: createCoverPage('RelayTale', 'Published by RelayTale Press', false), isCover: true });
+            // Back cover with disclaimer
+            newPages.push({ html: createBackCover(), isCover: true });
 
             pages = newPages;
             currentPageIndex = 0;
