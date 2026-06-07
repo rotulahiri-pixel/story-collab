@@ -30,10 +30,10 @@
         .app-container {
             width: 100%;
             max-width: 420px;
-            height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
+            height: 100vh;
             justify-content: space-between;
         }
         .book-wrapper {
@@ -58,7 +58,7 @@
             width: 100%;
             height: 100%;
             perspective: 1500px;
-            max-height: 90vh;               /* tall enough for 55-60 lines */
+            max-height: 85vh;
         }
         .page {
             position: absolute;
@@ -76,7 +76,7 @@
         .page.flipped { transform: rotateY(-180deg); }
         .page-content {
             flex: 1;
-            padding: 1.2rem 1rem 2.8rem 1rem;   /* bottom space for page number */
+            padding: 1.2rem 1rem 2.8rem 1rem;
             overflow-y: auto;
             font-size: 0.9rem;
             line-height: 1.6;
@@ -259,9 +259,9 @@
     const ENDPOINT = 'https://fra.cloud.appwrite.io/v1';
     const EMAIL = 'relaytale@gmail.com';
 
-    // Approx. 55-60 lines per page with 0.9rem font & 1.6 line-height
-    const MAX_CHARS_PER_PAGE = 2800;
-    const ORPHAN_MIN_CHARS = 120;
+    // Pagination: target 55-60 lines per page.
+    const MAX_CHARS_PER_PAGE = 3200;      // yields ~58 lines
+    const ORPHAN_MIN_CHARS = 100;
 
     const DISCLAIMER = `Disclaimer: The creator of this app has no control over, and assumes no responsibility or liability for, any content, opinions, or views expressed by users on this platform. User‑generated content does not reflect the views of the creator, and all interactions and posts are the sole responsibility of the respective users. The Intellectual Property Rights of the collaborative effort will rest with the platform presently.`;
 
@@ -309,20 +309,23 @@
     }
 
     // ===== STORY TITLE PAGE =====
-    function createStoryTitlePage(story) {
+    function createStoryTitlePage(title, authors) {
         return `
             <div class="story-title-page">
-                <div class="story-title-main">${story.title}</div>
-                <div class="story-authors">By ${story.writers || story.creatorName}</div>
+                <div class="story-title-main">${title}</div>
+                <div class="story-authors">By ${authors}</div>
             </div>`;
     }
 
-    // ===== SOLID PAGINATION (55-60 lines per page) =====
-    function paginateStory(story, chapters) {
+    // ===== RELIABLE PAGINATION (55‑60 lines) =====
+    function paginateChapters(title, authors, chapters, status) {
         const pagesForStory = [];
-        pagesForStory.push({ html: createStoryTitlePage(story), isStoryTitle: true });
+        // Title page
+        pagesForStory.push({ html: createStoryTitlePage(title, authors), isStoryTitle: true });
 
-        // Build full text with explicit session labels and line breaks
+        if (!chapters || chapters.length === 0) return pagesForStory;
+
+        // Build full text with session labels and line breaks
         let fullText = '';
         chapters.forEach(ch => {
             fullText += `<span class="session-label">Session ${ch.chapterNumber} — by ${ch.authorName}</span>\n`;
@@ -336,7 +339,6 @@
 
         for (const para of paragraphs) {
             const paraChars = para.length;
-            // If paragraph fits on current page, add it
             if (currentPageChars + paraChars <= MAX_CHARS_PER_PAGE) {
                 if (currentPageContent) currentPageContent += '\n\n';
                 currentPageContent += para;
@@ -361,7 +363,6 @@
                         chunkChars += word.length + (chunk ? 1 : 0);
                     }
                 }
-                // remaining chunk
                 if (chunk) {
                     if (currentPageContent) currentPageContent += '\n\n' + chunk;
                     else currentPageContent = chunk;
@@ -370,7 +371,7 @@
             }
         }
 
-        // Orphan control: merge very short last page into previous one
+        // Orphan control
         if (currentPageContent && currentPageChars < ORPHAN_MIN_CHARS && pagesForStory.length > 0) {
             const lastPage = pagesForStory[pagesForStory.length - 1];
             lastPage.html = lastPage.html.replace('</div></div>', `\n\n${currentPageContent}</div></div>`);
@@ -380,7 +381,7 @@
 
         // Add end marker + share to last text page
         const lastIdx = pagesForStory.length - 1;
-        const endHtml = `<p class="story-end">${story.status === 'completed' ? '🏁 The End' : '✍️ In Progress'} <span class="share-mini" onclick="shareStory('${story.title.replace(/'/g, "\\'")}')">Share</span></p>`;
+        const endHtml = `<p class="story-end">${status === 'completed' ? '🏁 The End' : '✍️ In Progress'} <span class="share-mini" onclick="shareStory('${title.replace(/'/g, "\\'")}')">Share</span></p>`;
         pagesForStory[lastIdx].html = pagesForStory[lastIdx].html.replace('</div></div>', `${endHtml}</div></div>`);
 
         return pagesForStory;
@@ -447,7 +448,7 @@
         }
     };
 
-    // ===== FETCH FROM APPWRITE =====
+    // ===== FETCH FROM APPWRITE (BRANCHED SUPPORT) =====
     window.fetchLiveStories = async function() {
         if (PROJECT_ID === 'YOUR_PROJECT_ID') {
             alert('Please replace YOUR_PROJECT_ID with your real Appwrite Project ID.');
@@ -470,14 +471,33 @@
             newPages.push({ html: createCoverPage('RelayTale', coverSubtitle, false), isCover: true });
 
             for (const story of storiesRes.documents) {
-                const chRes = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, [
-                    Appwrite.Query.equal('storyId', story.$id),
-                    Appwrite.Query.orderAsc('chapterNumber')
-                ]);
-                const storyPages = paginateStory(story, chRes.documents);
-                newPages.push(...storyPages);
+                const isBranching = (story.isBranching === 'true' || story.isBranching === true);
+                if (isBranching) {
+                    // Process each flow separately
+                    for (const flowId of ['flow1', 'flow2', 'flow3']) {
+                        const flowName = { flow1: 'Flow One', flow2: 'Flow Two', flow3: 'Flow Three' }[flowId];
+                        const chRes = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, [
+                            Appwrite.Query.equal('storyId', story.$id),
+                            Appwrite.Query.equal('flowId', flowId),
+                            Appwrite.Query.orderAsc('chapterNumber')
+                        ]);
+                        if (chRes.documents.length === 0) continue; // skip empty flows
+                        const flowTitle = `${story.title} — ${flowName}`;
+                        const storyPages = paginateChapters(flowTitle, story.writers || story.creatorName, chRes.documents, story.status);
+                        newPages.push(...storyPages);
+                    }
+                } else {
+                    // Non-branched story
+                    const chRes = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, [
+                        Appwrite.Query.equal('storyId', story.$id),
+                        Appwrite.Query.orderAsc('chapterNumber')
+                    ]);
+                    const storyPages = paginateChapters(story.title, story.writers || story.creatorName, chRes.documents, story.status);
+                    newPages.push(...storyPages);
+                }
             }
 
+            // Back cover
             newPages.push({ html: createBackCover(), isCover: true });
 
             pages = newPages;
@@ -490,7 +510,7 @@
         }
     };
 
-    // ===== STABLE SWIPE & SCROLL =====
+    // ===== STABLE TOUCH & SCROLL =====
     const flipContainerEl = document.querySelector('.book-flip-container');
     let touchStartX = 0, touchStartY = 0;
 
