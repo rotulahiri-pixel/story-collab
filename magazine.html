@@ -53,13 +53,12 @@
             box-shadow: inset -2px 0 4px rgba(0,0,0,0.5);
             z-index: 5;
         }
-        /* Fixed‑height book container – never jumps */
         .book-flip-container {
             position: relative;
             width: 100%;
             height: 100%;
-            max-height: 85vh;      /* fits inside the wrapper with buttons visible */
             perspective: 1500px;
+            max-height: 90vh;               /* tall enough for 55-60 lines */
         }
         .page {
             position: absolute;
@@ -77,7 +76,7 @@
         .page.flipped { transform: rotateY(-180deg); }
         .page-content {
             flex: 1;
-            padding: 1.2rem 1rem 2.8rem 1rem;
+            padding: 1.2rem 1rem 2.8rem 1rem;   /* bottom space for page number */
             overflow-y: auto;
             font-size: 0.9rem;
             line-height: 1.6;
@@ -95,18 +94,20 @@
             bottom: 0; left: 0; right: 0;
         }
 
-        /* Morocco leather cover – flex layout that always fills the page */
+        /* Morocco leather cover – unchanged from your stable build */
         .cover-page {
             background: linear-gradient(135deg, #5a2d1a 0%, #3c1e0f 40%, #2a1005 100%);
             border-radius: 0 6px 6px 0;
             box-shadow: 0 4px 20px rgba(0,0,0,0.5);
             display: flex;
             flex-direction: column;
-            justify-content: space-between;
+            align-items: center;
+            justify-content: flex-start;
+            text-align: center;
+            padding-top: 20%;
+            position: relative;
             height: 100%;
             color: var(--cream);
-            position: relative;
-            overflow: hidden;
         }
         .cover-page::before,
         .cover-page::after,
@@ -122,12 +123,8 @@
         .cover-page .corner-tr { top: 8px; right: 8px; border-left: none; border-bottom: none; }
         .cover-page .corner-bl { bottom: 8px; left: 8px; border-right: none; border-top: none; }
 
-        .cover-top {
-            padding-top: 18%;
-            text-align: center;
-        }
         .cover-title {
-            font-size: 2.4rem;
+            font-size: 2.8rem;
             font-weight: bold;
             letter-spacing: 4px;
             text-transform: uppercase;
@@ -145,29 +142,6 @@
             width: 50%;
             margin: 1rem auto;
             border-top: 2px double var(--gold);
-        }
-        .cover-bottom {
-            padding-bottom: 1.5rem;
-            text-align: center;
-        }
-        .cover-fetch-btn {
-            background: var(--gold);
-            color: var(--ink);
-            border: 2px solid var(--accent);
-            padding: 0.5rem 1rem;
-            font-family: 'Georgia', serif;
-            font-size: 0.9rem;
-            cursor: pointer;
-            border-radius: 4px;
-            letter-spacing: 1px;
-            margin-bottom: 0.5rem;
-        }
-        .cover-fetch-btn:hover { background: var(--accent); color: var(--cream); }
-        .fetch-status {
-            color: var(--cream);
-            font-size: 0.8rem;
-            margin-top: 0.3rem;
-            font-style: italic;
         }
 
         /* Story title page */
@@ -224,6 +198,29 @@
             text-align: center;
         }
 
+        /* Fetch button on cover */
+        .cover-fetch-btn {
+            background: var(--gold);
+            color: var(--ink);
+            border: 2px solid var(--accent);
+            padding: 0.5rem 1rem;
+            font-family: 'Georgia', serif;
+            font-size: 0.9rem;
+            cursor: pointer;
+            border-radius: 4px;
+            letter-spacing: 1px;
+            margin-top: auto;
+            margin-bottom: 1.5rem;
+        }
+        .cover-fetch-btn:hover { background: var(--accent); color: var(--cream); }
+        .fetch-status {
+            color: var(--cream);
+            font-size: 0.8rem;
+            margin-top: 0.5rem;
+            text-align: center;
+            font-style: italic;
+        }
+
         /* Typography */
         .story-authors { font-size: 0.7rem; font-style: italic; color: var(--accent); margin-top: 0.5rem; }
         .story-text {
@@ -236,7 +233,7 @@
         .session-label { font-style: italic; color: var(--accent); font-size: 0.75rem; margin-bottom: 0.2rem; display: block; }
         .story-end { text-align: center; font-style: italic; color: var(--accent); margin-top: 0.4rem; font-size: 0.8rem; }
         .share-mini { font-size: 0.7rem; color: var(--accent); cursor: pointer; text-decoration: underline; margin-left: 0.5rem; }
-        .disclaimer-text { font-size: 0.7rem; color: var(--cream); line-height: 1.5; margin-top: 1rem; opacity: 0.8; padding: 0 1rem; }
+        .disclaimer-text { font-size: 0.7rem; color: var(--cream); line-height: 1.5; margin-top: 2rem; opacity: 0.8; padding: 0 1rem; }
     </style>
 </head>
 <body>
@@ -262,6 +259,7 @@
     const ENDPOINT = 'https://fra.cloud.appwrite.io/v1';
     const EMAIL = 'relaytale@gmail.com';
 
+    // Pagination settings (55-60 lines per page)
     const MAX_CHARS_PER_PAGE = 3200;
     const ORPHAN_MIN_CHARS = 100;
 
@@ -278,7 +276,7 @@
     const nextBtn = document.getElementById('nextBtn');
     const pageIndicator = document.getElementById('pageIndicator');
 
-    // ===== COVER PAGE =====
+    // ===== COVER PAGE GENERATOR (stable layout) =====
     function createCoverPage(title, subtitle, includeFetch = false) {
         const fetchHTML = includeFetch ? `
             <button class="cover-fetch-btn" onclick="event.stopPropagation(); fetchLiveStories()">📡 Fetch Stories from Appwrite</button>
@@ -287,16 +285,12 @@
         return `
             <div class="cover-page">
                 <span class="corner-tl"></span><span class="corner-tr"></span><span class="corner-bl"></span><span class="corner-br"></span>
-                <div class="cover-top">
-                    <div class="cover-title">${title}</div>
-                    <div class="cover-divider"></div>
-                    <div class="cover-subtitle">Where Writers Create Stories By Turn</div>
-                    <div style="margin-top:2rem;font-size:0.8rem;letter-spacing:2px;">${subtitle}</div>
-                    <div style="margin-top:1rem;font-size:0.7rem;">${EMAIL}</div>
-                </div>
-                <div class="cover-bottom">
-                    ${fetchHTML}
-                </div>
+                <div class="cover-title">${title}</div>
+                <div class="cover-divider"></div>
+                <div class="cover-subtitle">Where Writers Create Stories By Turn</div>
+                <div style="margin-top:2rem;font-size:0.8rem;letter-spacing:2px;">${subtitle}</div>
+                <div style="margin-top:1rem;font-size:0.7rem;">${EMAIL}</div>
+                ${fetchHTML}
             </div>`;
     }
 
@@ -305,18 +299,16 @@
         return `
             <div class="cover-page">
                 <span class="corner-tl"></span><span class="corner-tr"></span><span class="corner-bl"></span><span class="corner-br"></span>
-                <div class="cover-top" style="padding-top:15%;">
-                    <div class="cover-title" style="font-size:2rem;">RelayTale</div>
-                    <div class="cover-divider"></div>
-                    <div class="cover-subtitle">Where Writers Create Stories By Turn</div>
-                    <div style="margin-top:1.5rem;font-size:0.8rem;letter-spacing:2px;">Published by RelayTale Press</div>
-                    <div style="margin-top:0.5rem;font-size:0.7rem;">${EMAIL}</div>
-                    <div class="disclaimer-text">${DISCLAIMER}</div>
-                </div>
+                <div class="cover-title" style="font-size:2rem;">RelayTale</div>
+                <div class="cover-divider"></div>
+                <div class="cover-subtitle">Where Writers Create Stories By Turn</div>
+                <div style="margin-top:1.5rem;font-size:0.8rem;letter-spacing:2px;">Published by RelayTale Press</div>
+                <div style="margin-top:0.5rem;font-size:0.7rem;">${EMAIL}</div>
+                <div class="disclaimer-text">${DISCLAIMER}</div>
             </div>`;
     }
 
-    // ===== STORY TITLE PAGE =====
+    // ===== STORY TITLE PAGE (accepts title string and authors string) =====
     function createStoryTitlePage(title, authors) {
         return `
             <div class="story-title-page">
@@ -325,13 +317,14 @@
             </div>`;
     }
 
-    // ===== PAGINATION (55‑60 lines) =====
+    // ===== IMPROVED PAGINATION (55‑60 lines, branched‑ready) =====
     function paginateChapters(title, authors, chapters, status) {
         const pagesForStory = [];
         pagesForStory.push({ html: createStoryTitlePage(title, authors), isStoryTitle: true });
 
         if (!chapters || chapters.length === 0) return pagesForStory;
 
+        // Build full text with session labels and line breaks
         let fullText = '';
         chapters.forEach(ch => {
             fullText += `<span class="session-label">Session ${ch.chapterNumber} — by ${ch.authorName}</span>\n`;
@@ -374,6 +367,7 @@
             }
         }
 
+        // Orphan control
         if (currentPageContent && currentPageChars < ORPHAN_MIN_CHARS && pagesForStory.length > 0) {
             const lastPage = pagesForStory[pagesForStory.length - 1];
             lastPage.html = lastPage.html.replace('</div></div>', `\n\n${currentPageContent}</div></div>`);
@@ -381,8 +375,10 @@
             pagesForStory.push({ html: `<div style="padding:1rem;"><div class="story-text">${currentPageContent}</div></div>` });
         }
 
+        // Add end marker + share to last text page
         const lastIdx = pagesForStory.length - 1;
-        const endHtml = `<p class="story-end">${status === 'completed' ? '🏁 The End' : '✍️ In Progress'} <span class="share-mini" onclick="shareStory('${title.replace(/'/g, "\\'")}')">Share</span></p>`;
+        const safeTitle = title.replace(/'/g, "\\'");
+        const endHtml = `<p class="story-end">${status === 'completed' ? '🏁 The End' : '✍️ In Progress'} <span class="share-mini" onclick="shareStory('${safeTitle}')">Share</span></p>`;
         pagesForStory[lastIdx].html = pagesForStory[lastIdx].html.replace('</div></div>', `${endHtml}</div></div>`);
 
         return pagesForStory;
@@ -449,7 +445,7 @@
         }
     };
 
-    // ===== FETCH FROM APPWRITE (Session 1 always included) =====
+    // ===== FETCH FROM APPWRITE (BRANCHED STORIES HANDLED) =====
     window.fetchLiveStories = async function() {
         if (PROJECT_ID === 'YOUR_PROJECT_ID') {
             alert('Please replace YOUR_PROJECT_ID with your real Appwrite Project ID.');
@@ -472,6 +468,7 @@
             newPages.push({ html: createCoverPage('RelayTale', coverSubtitle, false), isCover: true });
 
             for (const story of storiesRes.documents) {
+                // Fetch Session 1 (required for all flows)
                 const s1Res = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, [
                     Appwrite.Query.equal('storyId', story.$id),
                     Appwrite.Query.equal('chapterNumber', 1)
@@ -479,33 +476,39 @@
                 const session1 = s1Res.documents.length > 0 ? [s1Res.documents[0]] : [];
 
                 const isBranching = (story.isBranching === 'true' || story.isBranching === true);
+                const authors = story.writers || story.creatorName;
 
                 if (isBranching) {
+                    // Process each flow separately
                     for (const flowId of ['flow1', 'flow2', 'flow3']) {
-                        const flowNumber = flowId.slice(-1);
+                        const flowNumber = flowId.slice(-1); // '1','2','3'
                         const chRes = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, [
                             Appwrite.Query.equal('storyId', story.$id),
                             Appwrite.Query.equal('flowId', flowId),
                             Appwrite.Query.orderAsc('chapterNumber')
                         ]);
-                        if (chRes.documents.length === 0) continue;
+                        if (chRes.documents.length === 0) continue; // skip empty flows
+
+                        // Prepend Session 1
                         const flowChapters = [...session1, ...chRes.documents];
                         const flowTitle = `${story.title} — ${flowNumber}`;
-                        const storyPages = paginateChapters(flowTitle, story.writers || story.creatorName, flowChapters, story.status);
+                        const storyPages = paginateChapters(flowTitle, authors, flowChapters, story.status);
                         newPages.push(...storyPages);
                     }
                 } else {
+                    // Non-branched story: use all chapters (already includes session 1)
                     const chRes = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, [
                         Appwrite.Query.equal('storyId', story.$id),
                         Appwrite.Query.orderAsc('chapterNumber')
                     ]);
-                    const allChapters = chRes.documents;
-                    const storyPages = paginateChapters(story.title, story.writers || story.creatorName, allChapters, story.status);
+                    const storyPages = paginateChapters(story.title, authors, chRes.documents, story.status);
                     newPages.push(...storyPages);
                 }
             }
 
+            // Back cover
             newPages.push({ html: createBackCover(), isCover: true });
+
             pages = newPages;
             currentPageIndex = 0;
             renderBook();
@@ -516,7 +519,7 @@
         }
     };
 
-    // ===== STABLE TOUCH & KEYBOARD =====
+    // ===== STABLE SWIPE & SCROLL =====
     const flipContainerEl = document.querySelector('.book-flip-container');
     let touchStartX = 0, touchStartY = 0;
 
