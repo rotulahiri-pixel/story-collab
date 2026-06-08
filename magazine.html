@@ -53,12 +53,14 @@
             box-shadow: inset -2px 0 4px rgba(0,0,0,0.5);
             z-index: 5;
         }
+        /* Stable aspect-ratio container */
         .book-flip-container {
             position: relative;
             width: 100%;
-            height: 100%;
+            /* 9:16 portrait ratio gives a tall book that never changes */
+            padding-bottom: 160%;
             perspective: 1500px;
-            max-height: 85vh;
+            margin: 0 auto;
         }
         .page {
             position: absolute;
@@ -94,16 +96,20 @@
             bottom: 0; left: 0; right: 0;
         }
 
-        /* Morocco leather cover – now absolutely positioned for stability */
+        /* Morocco leather cover – now a flex column that fills the page */
         .cover-page {
             background: linear-gradient(135deg, #5a2d1a 0%, #3c1e0f 40%, #2a1005 100%);
             border-radius: 0 6px 6px 0;
             box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;  /* title top, button bottom */
             height: 100%;
             color: var(--cream);
+            position: relative;
             overflow: hidden;
         }
+        /* Gold corner ornaments */
         .cover-page::before,
         .cover-page::after,
         .cover-page .corner-tr,
@@ -118,10 +124,8 @@
         .cover-page .corner-tr { top: 8px; right: 8px; border-left: none; border-bottom: none; }
         .cover-page .corner-bl { bottom: 8px; left: 8px; border-right: none; border-top: none; }
 
-        .cover-content {
-            position: absolute;
-            top: 22%;               /* 25% from top, adjusted for better centering */
-            left: 0; right: 0;
+        .cover-top {
+            padding-top: 20%;
             text-align: center;
         }
         .cover-title {
@@ -145,9 +149,7 @@
             border-top: 2px double var(--gold);
         }
         .cover-bottom {
-            position: absolute;
-            bottom: 1.5rem;
-            left: 0; right: 0;
+            padding-bottom: 1.5rem;
             text-align: center;
         }
         .cover-fetch-btn {
@@ -278,7 +280,7 @@
     const nextBtn = document.getElementById('nextBtn');
     const pageIndicator = document.getElementById('pageIndicator');
 
-    // ===== COVER PAGE (stable absolute layout) =====
+    // ===== COVER PAGE =====
     function createCoverPage(title, subtitle, includeFetch = false) {
         const fetchHTML = includeFetch ? `
             <button class="cover-fetch-btn" onclick="event.stopPropagation(); fetchLiveStories()">📡 Fetch Stories from Appwrite</button>
@@ -287,7 +289,7 @@
         return `
             <div class="cover-page">
                 <span class="corner-tl"></span><span class="corner-tr"></span><span class="corner-bl"></span><span class="corner-br"></span>
-                <div class="cover-content">
+                <div class="cover-top">
                     <div class="cover-title">${title}</div>
                     <div class="cover-divider"></div>
                     <div class="cover-subtitle">Where Writers Create Stories By Turn</div>
@@ -305,7 +307,7 @@
         return `
             <div class="cover-page">
                 <span class="corner-tl"></span><span class="corner-tr"></span><span class="corner-bl"></span><span class="corner-br"></span>
-                <div class="cover-content" style="top:15%;">
+                <div class="cover-top" style="padding-top:15%;">
                     <div class="cover-title" style="font-size:2rem;">RelayTale</div>
                     <div class="cover-divider"></div>
                     <div class="cover-subtitle">Where Writers Create Stories By Turn</div>
@@ -325,7 +327,7 @@
             </div>`;
     }
 
-    // ===== PAGINATION (unchanged logic) =====
+    // ===== PAGINATION =====
     function paginateChapters(title, authors, chapters, status) {
         const pagesForStory = [];
         pagesForStory.push({ html: createStoryTitlePage(title, authors), isStoryTitle: true });
@@ -449,7 +451,7 @@
         }
     };
 
-    // ===== FETCH FROM APPWRITE (Session 1 always included, branched label = 1/2/3) =====
+    // ===== FETCH FROM APPWRITE (Session 1 always included) =====
     window.fetchLiveStories = async function() {
         if (PROJECT_ID === 'YOUR_PROJECT_ID') {
             alert('Please replace YOUR_PROJECT_ID with your real Appwrite Project ID.');
@@ -472,7 +474,6 @@
             newPages.push({ html: createCoverPage('RelayTale', coverSubtitle, false), isCover: true });
 
             for (const story of storiesRes.documents) {
-                // Fetch Session 1 (always needed)
                 const s1Res = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, [
                     Appwrite.Query.equal('storyId', story.$id),
                     Appwrite.Query.equal('chapterNumber', 1)
@@ -483,26 +484,24 @@
 
                 if (isBranching) {
                     for (const flowId of ['flow1', 'flow2', 'flow3']) {
-                        const flowNumber = flowId.slice(-1); // '1','2','3'
+                        const flowNumber = flowId.slice(-1);
                         const chRes = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, [
                             Appwrite.Query.equal('storyId', story.$id),
                             Appwrite.Query.equal('flowId', flowId),
                             Appwrite.Query.orderAsc('chapterNumber')
                         ]);
-                        if (chRes.documents.length === 0) continue; // skip empty flows
-                        // Prepend Session 1 to this flow's chapters
+                        if (chRes.documents.length === 0) continue;
                         const flowChapters = [...session1, ...chRes.documents];
                         const flowTitle = `${story.title} — ${flowNumber}`;
                         const storyPages = paginateChapters(flowTitle, story.writers || story.creatorName, flowChapters, story.status);
                         newPages.push(...storyPages);
                     }
                 } else {
-                    // Non-branched: just Session 1 + all other chapters
                     const chRes = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, [
                         Appwrite.Query.equal('storyId', story.$id),
                         Appwrite.Query.orderAsc('chapterNumber')
                     ]);
-                    const allChapters = chRes.documents; // already includes session 1
+                    const allChapters = chRes.documents;
                     const storyPages = paginateChapters(story.title, story.writers || story.creatorName, allChapters, story.status);
                     newPages.push(...storyPages);
                 }
@@ -519,7 +518,7 @@
         }
     };
 
-    // ===== STABLE TOUCH & SCROLL =====
+    // ===== STABLE TOUCH & KEYBOARD =====
     const flipContainerEl = document.querySelector('.book-flip-container');
     let touchStartX = 0, touchStartY = 0;
 
