@@ -53,14 +53,13 @@
             box-shadow: inset -2px 0 4px rgba(0,0,0,0.5);
             z-index: 5;
         }
-        /* Stable aspect-ratio container */
+        /* Fixed‑height book container – never jumps */
         .book-flip-container {
             position: relative;
             width: 100%;
-            /* 9:16 portrait ratio gives a tall book that never changes */
-            padding-bottom: 160%;
+            height: 100%;
+            max-height: 85vh;      /* fits inside the wrapper with buttons visible */
             perspective: 1500px;
-            margin: 0 auto;
         }
         .page {
             position: absolute;
@@ -96,20 +95,19 @@
             bottom: 0; left: 0; right: 0;
         }
 
-        /* Morocco leather cover – now a flex column that fills the page */
+        /* Morocco leather cover – flex layout that always fills the page */
         .cover-page {
             background: linear-gradient(135deg, #5a2d1a 0%, #3c1e0f 40%, #2a1005 100%);
             border-radius: 0 6px 6px 0;
             box-shadow: 0 4px 20px rgba(0,0,0,0.5);
             display: flex;
             flex-direction: column;
-            justify-content: space-between;  /* title top, button bottom */
+            justify-content: space-between;
             height: 100%;
             color: var(--cream);
             position: relative;
             overflow: hidden;
         }
-        /* Gold corner ornaments */
         .cover-page::before,
         .cover-page::after,
         .cover-page .corner-tr,
@@ -125,7 +123,7 @@
         .cover-page .corner-bl { bottom: 8px; left: 8px; border-right: none; border-top: none; }
 
         .cover-top {
-            padding-top: 20%;
+            padding-top: 18%;
             text-align: center;
         }
         .cover-title {
@@ -327,7 +325,7 @@
             </div>`;
     }
 
-    // ===== PAGINATION =====
+    // ===== PAGINATION (55‑60 lines) =====
     function paginateChapters(title, authors, chapters, status) {
         const pagesForStory = [];
         pagesForStory.push({ html: createStoryTitlePage(title, authors), isStoryTitle: true });
