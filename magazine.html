@@ -35,56 +35,35 @@
             justify-content: center;
             position: relative;
         }
-        /* Book wrapper – fills available space, max width for readability */
         .book-wrapper {
             position: relative;
             width: 100%;
             max-width: 500px;
             height: 100%;
             display: flex;
+            flex-direction: column;
             align-items: center;
-            justify-content: center;
         }
-        .book-spine {
-            position: absolute;
-            top: 0; left: -22px; bottom: 0; width: 22px;
-            background: linear-gradient(to right, #3c1e0f, #5a2d1a, #3c1e0f);
-            border-radius: 5px 0 0 5px;
-            box-shadow: inset -2px 0 4px rgba(0,0,0,0.5);
-            z-index: 5;
-        }
-        .book-flip-container {
-            position: relative;
+        /* Simple page container – shows one page at a time */
+        .page-view {
             width: 100%;
-            height: 100%;
-            perspective: 1500px;
-        }
-        .page {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
+            flex: 1;
             background: var(--cream);
-            border-radius: 0 6px 6px 0;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5), inset 0 0 30px rgba(139,69,19,0.05);
-            transform-origin: left center;
-            transition: transform 0.6s cubic-bezier(0.4, 0.0, 0.2, 1);
-            backface-visibility: hidden;
-            overflow: hidden;
+            border-radius: 6px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
             display: flex;
             flex-direction: column;
-            will-change: transform;
-        }
-        .page.flipped {
-            transform: rotateY(-180deg);
+            overflow: hidden;
+            position: relative;
         }
         .page-content {
             flex: 1;
-            padding: 1.5rem 1.2rem 3rem 1.2rem;  /* extra bottom for arrows */
+            padding: 1.5rem 1.2rem 3rem 1.2rem;
             overflow-y: auto;
             font-size: 1rem;
             line-height: 1.6;
             color: var(--ink);
             -webkit-overflow-scrolling: touch;
-            position: relative;
         }
         .page-number {
             text-align: center;
@@ -95,17 +74,15 @@
             background: var(--cream);
         }
 
-        /* Navigation arrows at page bottom */
-        .nav-arrows {
-            position: absolute;
-            bottom: 0.8rem;
-            left: 0;
-            right: 0;
+        /* Navigation bar */
+        .nav-bar {
             display: flex;
+            align-items: center;
             justify-content: space-between;
-            padding: 0 1.5rem;
-            pointer-events: none;
-            z-index: 10;
+            width: 100%;
+            padding: 0.5rem 1rem;
+            color: var(--cream);
+            font-family: 'Georgia', serif;
         }
         .nav-arrow {
             background: transparent;
@@ -113,18 +90,19 @@
             font-size: 2rem;
             color: #aaa;
             cursor: pointer;
-            pointer-events: auto;
-            line-height: 1;
-            padding: 0 0.2rem;
-            transition: color 0.2s;
+            padding: 0 0.5rem;
         }
         .nav-arrow:active { color: var(--accent); }
         .nav-arrow:disabled { opacity: 0.3; pointer-events: none; }
+        .page-indicator {
+            font-size: 0.9rem;
+            letter-spacing: 2px;
+        }
 
-        /* Morocco leather cover */
+        /* Morocco leather cover (reused for first/last page if needed) */
         .cover-page {
             background: linear-gradient(135deg, #5a2d1a 0%, #3c1e0f 40%, #2a1005 100%);
-            border-radius: 0 6px 6px 0;
+            border-radius: 6px;
             box-shadow: 0 4px 20px rgba(0,0,0,0.5);
             display: flex;
             flex-direction: column;
@@ -132,9 +110,9 @@
             justify-content: flex-start;
             text-align: center;
             padding-top: 25%;
-            position: relative;
             height: 100%;
             color: var(--cream);
+            position: relative;
         }
         .cover-page::before,
         .cover-page::after,
@@ -229,8 +207,15 @@
 <body>
 <div class="app-container">
     <div class="book-wrapper" id="bookWrapper">
-        <div class="book-spine"></div>
-        <div class="book-flip-container" id="flipContainer"></div>
+        <div class="page-view" id="pageView">
+            <div class="page-content" id="pageContent"></div>
+            <div class="page-number" id="pageNumber">1</div>
+        </div>
+        <div class="nav-bar">
+            <button class="nav-arrow" id="prevBtn" onclick="prevPage()">‹</button>
+            <span class="page-indicator" id="pageIndicator">Cover</span>
+            <button class="nav-arrow" id="nextBtn" onclick="nextPage()">›</button>
+        </div>
     </div>
 </div>
 
@@ -249,11 +234,14 @@
     const DISCLAIMER = `Disclaimer: The creator of this app has no control over, and assumes no responsibility or liability for, any content, opinions, or views expressed by users on this platform. User‑generated content does not reflect the views of the creator, and all interactions and posts are the sole responsibility of the respective users. The Intellectual Property Rights of the collaborative effort will rest with the platform presently.`;
 
     // ===== STATE =====
-    let pages = [];                     // {html, isCover, isStoryTitle}
+    let pages = [];
     let currentPageIndex = 0;
-    let isAnimating = false;
 
-    const flipContainer = document.getElementById('flipContainer');
+    const pageContent = document.getElementById('pageContent');
+    const pageNumber = document.getElementById('pageNumber');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const pageIndicator = document.getElementById('pageIndicator');
 
     // ===== PAGE BUILDERS =====
     function createCoverPage(title, subtitle, includeFetch = false) {
@@ -294,7 +282,7 @@
             </div>`;
     }
 
-    // ===== PAGINATION (robust) =====
+    // ===== PAGINATION =====
     function paginateChapters(title, authors, chapters, status) {
         const pagesForStory = [];
         pagesForStory.push({ html: createStoryTitlePage(title, authors), isStoryTitle: true });
@@ -307,32 +295,25 @@
         for (let i = 0; i < chapters.length; i++) {
             const ch = chapters[i];
             const labelHtml = `<span class="session-label">Session ${ch.chapterNumber} — by ${ch.authorName}</span>`;
-            const contentHtml = ch.content;   // plain text
+            const contentHtml = ch.content;
 
-            // Combine label + newline + content + double newline
             const segmentHtml = labelHtml + '\n' + contentHtml + '\n\n';
-            const segmentChars = (ch.content.length + labelHtml.length + 3); // rough
+            const segmentChars = contentHtml.length + labelHtml.length + 3;
 
             if (currentChars + segmentChars > MAX_CHARS_PER_PAGE && currentChars > 0) {
-                // Save current page
                 pagesForStory.push({ html: `<div class="story-text">${currentHtml}</div>` });
                 currentHtml = '';
                 currentChars = 0;
             }
 
-            // Now add the segment (might still be too large, split content if needed)
+            // If segment alone is too large, split content by words
             if (segmentChars > MAX_CHARS_PER_PAGE) {
-                // split content into multiple pages
-                const words = contentHtml.split(/\s+/);
-                let chunk = '';
-                let chunkChars = 0;
-                // add label first
                 currentHtml += labelHtml + '\n';
                 currentChars += labelHtml.length + 1;
-
+                const words = contentHtml.split(/\s+/);
+                let chunk = '', chunkChars = 0;
                 for (const word of words) {
-                    const wordLen = word.length + 1;
-                    if (chunkChars + wordLen > MAX_CHARS_PER_PAGE && chunkChars > 0) {
+                    if (chunkChars + word.length + 1 > MAX_CHARS_PER_PAGE && chunkChars > 0) {
                         currentHtml += chunk;
                         pagesForStory.push({ html: `<div class="story-text">${currentHtml}</div>` });
                         currentHtml = '';
@@ -341,7 +322,7 @@
                         chunkChars = word.length;
                     } else {
                         chunk += (chunk ? ' ' : '') + word;
-                        chunkChars += wordLen;
+                        chunkChars += word.length + (chunk ? 1 : 0);
                     }
                 }
                 if (chunk) {
@@ -356,7 +337,6 @@
 
         // Final page
         if (currentHtml.trim().length > 0) {
-            // Orphan control: if last page is very short, merge with previous
             if (currentChars < ORPHAN_MIN_CHARS && pagesForStory.length > 0) {
                 const lastPage = pagesForStory[pagesForStory.length - 1];
                 lastPage.html = lastPage.html.replace('</div>', `\n\n${currentHtml}</div>`);
@@ -365,104 +345,34 @@
             }
         }
 
-        // Add end marker + share to last text page
+        // Add end marker + share
         const lastIdx = pagesForStory.length - 1;
         const safeTitle = title.replace(/'/g, "\\'");
         const endHtml = `<p class="story-end">${status === 'completed' ? '🏁 The End' : '✍️ In Progress'} <span class="share-mini" onclick="shareStory('${safeTitle}')">Share</span></p>`;
         let lastHtml = pagesForStory[lastIdx].html;
-        // Insert before closing div if there's a wrapper div (story-text), else just append
-        if (lastHtml.includes('<div class="story-text">')) {
-            lastHtml = lastHtml.replace('</div>', `${endHtml}</div>`);
-        } else {
-            lastHtml += endHtml;
-        }
+        lastHtml = lastHtml.replace('</div>', `${endHtml}</div>`);
         pagesForStory[lastIdx].html = lastHtml;
 
         return pagesForStory;
     }
 
-    // ===== RENDER BOOK =====
-    function renderBook() {
-        flipContainer.innerHTML = '';
-        for (let i = pages.length - 1; i >= 0; i--) {
-            const pageData = pages[i];
-            const pageDiv = document.createElement('div');
-            pageDiv.className = 'page';
-            pageDiv.dataset.index = i;
-            pageDiv.style.zIndex = pages.length - i;
-
-            const contentDiv = document.createElement('div');
-            contentDiv.className = 'page-content';
-            if (pageData.isCover || pageData.isStoryTitle) {
-                contentDiv.style.padding = '0';
-                contentDiv.style.overflow = 'hidden';
-            }
-            contentDiv.innerHTML = pageData.html;
-
-            // Add navigation arrows inside page content (only for non-cover pages maybe, but we'll add to all)
-            const arrowsDiv = document.createElement('div');
-            arrowsDiv.className = 'nav-arrows';
-            arrowsDiv.innerHTML = `
-                <button class="nav-arrow" id="prevArrow" onclick="prevPage()">‹</button>
-                <button class="nav-arrow" id="nextArrow" onclick="nextPage()">›</button>
-            `;
-            contentDiv.appendChild(arrowsDiv);
-
-            const pageNum = document.createElement('div');
-            pageNum.className = 'page-number';
-            pageNum.textContent = i + 1;
-
-            pageDiv.appendChild(contentDiv);
-            pageDiv.appendChild(pageNum);
-
-            if (i < currentPageIndex) {
-                pageDiv.classList.add('flipped');
-            }
-
-            flipContainer.appendChild(pageDiv);
-        }
-        updateArrowStates();
+    // ===== NAVIGATION =====
+    function showPage(index) {
+        if (!pages.length) return;
+        currentPageIndex = Math.max(0, Math.min(index, pages.length - 1));
+        const pageData = pages[currentPageIndex];
+        pageContent.innerHTML = pageData.html;
+        pageNumber.textContent = currentPageIndex + 1;
+        prevBtn.disabled = currentPageIndex === 0;
+        nextBtn.disabled = currentPageIndex === pages.length - 1;
+        pageIndicator.textContent = currentPageIndex === 0 ? 'Cover' :
+            currentPageIndex === pages.length - 1 ? 'Back Cover' :
+            `Page ${currentPageIndex + 1} of ${pages.length}`;
+        pageContent.scrollTop = 0;
     }
 
-    function flipTo(index) {
-        if (isAnimating || index === currentPageIndex || index < 0 || index >= pages.length) return;
-        isAnimating = true;
-
-        const currentPage = flipContainer.querySelector(`[data-index="${currentPageIndex}"]`);
-        const targetPage = flipContainer.querySelector(`[data-index="${index}"]`);
-
-        if (index > currentPageIndex) {
-            if (currentPage) {
-                currentPage.addEventListener('transitionend', function handler() {
-                    currentPage.removeEventListener('transitionend', handler);
-                    isAnimating = false;
-                    updateArrowStates();
-                });
-                currentPage.classList.add('flipped');
-            }
-        } else {
-            // Going back: unflip the page at the new index
-            if (targetPage) {
-                targetPage.addEventListener('transitionend', function handler() {
-                    targetPage.removeEventListener('transitionend', handler);
-                    isAnimating = false;
-                    updateArrowStates();
-                });
-                targetPage.classList.remove('flipped');
-            }
-        }
-        currentPageIndex = index;
-    }
-
-    function nextPage() { flipTo(currentPageIndex + 1); }
-    function prevPage() { flipTo(currentPageIndex - 1); }
-
-    function updateArrowStates() {
-        const prevArrows = flipContainer.querySelectorAll('#prevArrow');
-        const nextArrows = flipContainer.querySelectorAll('#nextArrow');
-        prevArrows.forEach(a => a.disabled = currentPageIndex === 0);
-        nextArrows.forEach(a => a.disabled = currentPageIndex === pages.length - 1);
-    }
+    function nextPage() { showPage(currentPageIndex + 1); }
+    function prevPage() { showPage(currentPageIndex - 1); }
 
     // ===== SHARE =====
     window.shareStory = function(title) {
@@ -481,14 +391,14 @@
             return;
         }
         const statusEl = document.getElementById('fetchStatusCover') || document.createElement('div');
-        if (statusEl) statusEl.textContent = 'Fetching...';
+        statusEl.textContent = 'Fetching...';
         try {
             const client = new Appwrite.Client();
             client.setEndpoint(ENDPOINT).setProject(PROJECT_ID);
             const databases = new Appwrite.Databases(client);
             const storiesRes = await databases.listDocuments(DATABASE_ID, STORIES_COLLECTION);
             if (storiesRes.documents.length === 0) {
-                if (statusEl) statusEl.textContent = 'No stories found.';
+                statusEl.textContent = 'No stories found.';
                 return;
             }
 
@@ -532,18 +442,17 @@
             newPages.push({ html: createBackCover(), isCover: true });
 
             pages = newPages;
-            currentPageIndex = 0;
-            renderBook();
-            if (statusEl) statusEl.textContent = `✅ Loaded ${storiesRes.documents.length} stories!`;
+            showPage(0);
+            statusEl.textContent = `✅ Loaded ${storiesRes.documents.length} stories!`;
         } catch (err) {
-            if (statusEl) statusEl.textContent = '❌ Error: ' + err.message;
+            statusEl.textContent = '❌ Error: ' + err.message;
             console.error(err);
         }
     };
 
-    // ===== INITIAL SAMPLE COVER =====
+    // ===== INIT =====
     pages = [{ html: createCoverPage('RelayTale', 'Sample Issue', true), isCover: true }];
-    renderBook();
+    showPage(0);
 
     // ===== KEYBOARD & TOUCH =====
     document.addEventListener('keydown', (e) => {
@@ -551,26 +460,17 @@
         if (e.key === 'ArrowLeft') { e.preventDefault(); prevPage(); }
     });
 
-    let touchStartX = 0, touchStartY = 0;
-    const bookEl = document.querySelector('.book-flip-container');
-    bookEl.addEventListener('touchstart', (e) => {
+    let touchStartX = 0;
+    document.addEventListener('touchstart', (e) => {
         touchStartX = e.touches[0].clientX;
-        touchStartY = e.touches[0].clientY;
     }, { passive: true });
-    bookEl.addEventListener('touchend', (e) => {
+    document.addEventListener('touchend', (e) => {
         const dx = touchStartX - e.changedTouches[0].clientX;
-        const dy = touchStartY - e.changedTouches[0].clientY;
-        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
-            e.preventDefault();
+        if (Math.abs(dx) > 50) {
             if (dx > 0) nextPage();
             else prevPage();
         }
     });
-    bookEl.addEventListener('touchmove', (e) => {
-        if (Math.abs(e.touches[0].clientX - touchStartX) > Math.abs(e.touches[0].clientY - touchStartY)) {
-            e.preventDefault();
-        }
-    }, { passive: false });
 </script>
 </body>
 </html>
