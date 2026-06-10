@@ -25,6 +25,7 @@
             overflow: hidden;
             user-select: none;
             -webkit-user-select: none;
+            touch-action: pan-y;  /* allow vertical scroll, block horizontal for swipe */
         }
         .app-container {
             width: 100%;
@@ -44,7 +45,6 @@
             flex-direction: column;
             align-items: center;
         }
-        /* Simple page container – shows one page at a time */
         .page-view {
             width: 100%;
             flex: 1;
@@ -58,7 +58,7 @@
         }
         .page-content {
             flex: 1;
-            padding: 1.5rem 1.2rem 3rem 1.2rem;
+            padding: 1.5rem 1.2rem 3.5rem 1.2rem; /* extra space for arrows */
             overflow-y: auto;
             font-size: 1rem;
             line-height: 1.6;
@@ -74,32 +74,32 @@
             background: var(--cream);
         }
 
-        /* Navigation bar */
-        .nav-bar {
+        /* Larger gray navigation arrows */
+        .nav-arrows {
+            position: absolute;
+            bottom: 0.8rem;
+            left: 0;
+            right: 0;
             display: flex;
-            align-items: center;
             justify-content: space-between;
-            width: 100%;
-            padding: 0.5rem 1rem;
-            color: var(--cream);
-            font-family: 'Georgia', serif;
+            padding: 0 1.5rem;
+            pointer-events: none;
+            z-index: 10;
         }
         .nav-arrow {
             background: transparent;
             border: none;
-            font-size: 2rem;
-            color: #aaa;
+            font-size: 2.5rem;          /* larger */
+            color: #999;                /* gray */
             cursor: pointer;
-            padding: 0 0.5rem;
+            pointer-events: auto;
+            line-height: 1;
+            transition: color 0.2s;
         }
         .nav-arrow:active { color: var(--accent); }
-        .nav-arrow:disabled { opacity: 0.3; pointer-events: none; }
-        .page-indicator {
-            font-size: 0.9rem;
-            letter-spacing: 2px;
-        }
+        .nav-arrow:disabled { opacity: 0.2; pointer-events: none; }
 
-        /* Morocco leather cover (reused for first/last page if needed) */
+        /* Morocco leather cover */
         .cover-page {
             background: linear-gradient(135deg, #5a2d1a 0%, #3c1e0f 40%, #2a1005 100%);
             border-radius: 6px;
@@ -209,12 +209,11 @@
     <div class="book-wrapper" id="bookWrapper">
         <div class="page-view" id="pageView">
             <div class="page-content" id="pageContent"></div>
+            <div class="nav-arrows">
+                <button class="nav-arrow" id="prevArrow" onclick="prevPage()">‹</button>
+                <button class="nav-arrow" id="nextArrow" onclick="nextPage()">›</button>
+            </div>
             <div class="page-number" id="pageNumber">1</div>
-        </div>
-        <div class="nav-bar">
-            <button class="nav-arrow" id="prevBtn" onclick="prevPage()">‹</button>
-            <span class="page-indicator" id="pageIndicator">Cover</span>
-            <button class="nav-arrow" id="nextBtn" onclick="nextPage()">›</button>
         </div>
     </div>
 </div>
@@ -228,6 +227,8 @@
     const ENDPOINT = 'https://fra.cloud.appwrite.io/v1';
     const EMAIL = 'relaytale@gmail.com';
 
+    // Target 55-60 lines per page. At 1rem font and 1.6 line-height,
+    // each line holds about 55 characters. 55*55=3025, 60*55=3300.
     const MAX_CHARS_PER_PAGE = 3200;
     const ORPHAN_MIN_CHARS = 100;
 
@@ -239,9 +240,8 @@
 
     const pageContent = document.getElementById('pageContent');
     const pageNumber = document.getElementById('pageNumber');
-    const prevBtn = document.getElementById('prevBtn');
-    const nextBtn = document.getElementById('nextBtn');
-    const pageIndicator = document.getElementById('pageIndicator');
+    const prevArrow = document.getElementById('prevArrow');
+    const nextArrow = document.getElementById('nextArrow');
 
     // ===== PAGE BUILDERS =====
     function createCoverPage(title, subtitle, includeFetch = false) {
@@ -282,60 +282,103 @@
             </div>`;
     }
 
-    // ===== PAGINATION =====
+    // ===== PRECISE PAGINATION (55-60 lines) =====
     function paginateChapters(title, authors, chapters, status) {
         const pagesForStory = [];
         pagesForStory.push({ html: createStoryTitlePage(title, authors), isStoryTitle: true });
 
         if (!chapters || chapters.length === 0) return pagesForStory;
 
+        // Build a plain text version to count characters accurately
+        let plainText = '';
+        chapters.forEach(ch => {
+            plainText += `Session ${ch.chapterNumber} — by ${ch.authorName}\n`;
+            plainText += ch.content + '\n\n';
+        });
+
+        // Now split plainText into pages, then map back to HTML segments
+        const htmlSegments = [];
+        chapters.forEach(ch => {
+            htmlSegments.push(`<span class="session-label">Session ${ch.chapterNumber} — by ${ch.authorName}</span>`);
+            htmlSegments.push(ch.content);
+        });
+
+        // We'll iterate through the plain text character by character,
+        // keeping track of which segment we're in.
+        let segIndex = 0;
+        let segOffset = 0; // character offset within current segment (0 = label, 1 = content)
         let currentHtml = '';
         let currentChars = 0;
 
-        for (let i = 0; i < chapters.length; i++) {
-            const ch = chapters[i];
-            const labelHtml = `<span class="session-label">Session ${ch.chapterNumber} — by ${ch.authorName}</span>`;
-            const contentHtml = ch.content;
-
-            const segmentHtml = labelHtml + '\n' + contentHtml + '\n\n';
-            const segmentChars = contentHtml.length + labelHtml.length + 3;
-
-            if (currentChars + segmentChars > MAX_CHARS_PER_PAGE && currentChars > 0) {
-                pagesForStory.push({ html: `<div class="story-text">${currentHtml}</div>` });
-                currentHtml = '';
-                currentChars = 0;
-            }
-
-            // If segment alone is too large, split content by words
-            if (segmentChars > MAX_CHARS_PER_PAGE) {
+        function addSegmentToPage(segIdx, offset) {
+            if (offset === 0) {
+                // Label
+                const labelHtml = htmlSegments[segIdx * 2];
                 currentHtml += labelHtml + '\n';
                 currentChars += labelHtml.length + 1;
-                const words = contentHtml.split(/\s+/);
-                let chunk = '', chunkChars = 0;
-                for (const word of words) {
-                    if (chunkChars + word.length + 1 > MAX_CHARS_PER_PAGE && chunkChars > 0) {
-                        currentHtml += chunk;
-                        pagesForStory.push({ html: `<div class="story-text">${currentHtml}</div>` });
-                        currentHtml = '';
-                        currentChars = 0;
-                        chunk = word;
-                        chunkChars = word.length;
-                    } else {
-                        chunk += (chunk ? ' ' : '') + word;
-                        chunkChars += word.length + (chunk ? 1 : 0);
-                    }
-                }
-                if (chunk) {
-                    currentHtml += chunk + '\n\n';
-                    currentChars += chunkChars + 2;
-                }
+                // move to content
+                return { nextSeg: segIdx, nextOffset: 1, remainingChars: plainText.split('\n')[segIdx * 2 + 1]?.length || 0 };
             } else {
-                currentHtml += segmentHtml;
-                currentChars += segmentChars;
+                // Content
+                const contentHtml = htmlSegments[segIdx * 2 + 1];
+                currentHtml += contentHtml + '\n\n';
+                currentChars += contentHtml.length + 2;
+                // move to next label
+                return { nextSeg: segIdx + 1, nextOffset: 0, remainingChars: 0 };
             }
         }
 
-        // Final page
+        let state = { nextSeg: 0, nextOffset: 0 };
+        while (state.nextSeg < chapters.length) {
+            const ch = chapters[state.nextSeg];
+            if (state.nextOffset === 0) {
+                // Add label
+                const labelHtml = htmlSegments[state.nextSeg * 2];
+                const labelChars = labelHtml.length + 1; // +1 for newline
+                if (currentChars + labelChars > MAX_CHARS_PER_PAGE && currentChars > 0) {
+                    // Save page
+                    pagesForStory.push({ html: `<div class="story-text">${currentHtml}</div>` });
+                    currentHtml = '';
+                    currentChars = 0;
+                }
+                currentHtml += labelHtml + '\n';
+                currentChars += labelChars;
+                state.nextOffset = 1; // move to content
+            }
+            if (state.nextOffset === 1) {
+                const contentHtml = htmlSegments[state.nextSeg * 2 + 1];
+                const contentChars = contentHtml.length;
+                if (currentChars + contentChars + 2 > MAX_CHARS_PER_PAGE) { // +2 for double newline
+                    // Content doesn't fit – split it
+                    const words = contentHtml.split(/\s+/);
+                    let chunk = '', chunkChars = 0;
+                    for (const word of words) {
+                        if (chunkChars + word.length + 1 > MAX_CHARS_PER_PAGE && chunkChars > 0) {
+                            currentHtml += chunk;
+                            pagesForStory.push({ html: `<div class="story-text">${currentHtml}</div>` });
+                            currentHtml = '';
+                            currentChars = 0;
+                            chunk = word;
+                            chunkChars = word.length;
+                        } else {
+                            chunk += (chunk ? ' ' : '') + word;
+                            chunkChars += word.length + (chunk ? 1 : 0);
+                        }
+                    }
+                    if (chunk) {
+                        currentHtml += chunk + '\n\n';
+                        currentChars += chunkChars + 2;
+                    }
+                } else {
+                    currentHtml += contentHtml + '\n\n';
+                    currentChars += contentChars + 2;
+                }
+                state.nextSeg++;
+                state.nextOffset = 0;
+            }
+        }
+
+        // Handle any remaining content
         if (currentHtml.trim().length > 0) {
             if (currentChars < ORPHAN_MIN_CHARS && pagesForStory.length > 0) {
                 const lastPage = pagesForStory[pagesForStory.length - 1];
@@ -345,7 +388,7 @@
             }
         }
 
-        // Add end marker + share
+        // Add end marker + share to last text page
         const lastIdx = pagesForStory.length - 1;
         const safeTitle = title.replace(/'/g, "\\'");
         const endHtml = `<p class="story-end">${status === 'completed' ? '🏁 The End' : '✍️ In Progress'} <span class="share-mini" onclick="shareStory('${safeTitle}')">Share</span></p>`;
@@ -363,11 +406,8 @@
         const pageData = pages[currentPageIndex];
         pageContent.innerHTML = pageData.html;
         pageNumber.textContent = currentPageIndex + 1;
-        prevBtn.disabled = currentPageIndex === 0;
-        nextBtn.disabled = currentPageIndex === pages.length - 1;
-        pageIndicator.textContent = currentPageIndex === 0 ? 'Cover' :
-            currentPageIndex === pages.length - 1 ? 'Back Cover' :
-            `Page ${currentPageIndex + 1} of ${pages.length}`;
+        prevArrow.disabled = currentPageIndex === 0;
+        nextArrow.disabled = currentPageIndex === pages.length - 1;
         pageContent.scrollTop = 0;
     }
 
@@ -454,19 +494,25 @@
     pages = [{ html: createCoverPage('RelayTale', 'Sample Issue', true), isCover: true }];
     showPage(0);
 
-    // ===== KEYBOARD & TOUCH =====
+    // ===== KEYBOARD & TOUCH (only horizontal swipes) =====
     document.addEventListener('keydown', (e) => {
         if (e.key === 'ArrowRight') { e.preventDefault(); nextPage(); }
         if (e.key === 'ArrowLeft') { e.preventDefault(); prevPage(); }
     });
 
-    let touchStartX = 0;
-    document.addEventListener('touchstart', (e) => {
+    let touchStartX = 0, touchStartY = 0;
+    const pageView = document.getElementById('pageView');
+    pageView.addEventListener('touchstart', (e) => {
         touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
     }, { passive: true });
-    document.addEventListener('touchend', (e) => {
+
+    pageView.addEventListener('touchend', (e) => {
         const dx = touchStartX - e.changedTouches[0].clientX;
-        if (Math.abs(dx) > 50) {
+        const dy = touchStartY - e.changedTouches[0].clientY;
+        // Only trigger page turn if horizontal movement is dominant and exceeds threshold
+        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
+            e.preventDefault();
             if (dx > 0) nextPage();
             else prevPage();
         }
