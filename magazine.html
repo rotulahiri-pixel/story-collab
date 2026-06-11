@@ -25,7 +25,7 @@
             overflow: hidden;
             user-select: none;
             -webkit-user-select: none;
-            touch-action: pan-y;  /* allow vertical scroll, block horizontal for swipe */
+            touch-action: pan-y;
         }
         .app-container {
             width: 100%;
@@ -58,7 +58,7 @@
         }
         .page-content {
             flex: 1;
-            padding: 1.5rem 1.2rem 3.5rem 1.2rem; /* extra space for arrows */
+            padding: 1.5rem 1.2rem 3.5rem 1.2rem;
             overflow-y: auto;
             font-size: 1rem;
             line-height: 1.6;
@@ -89,8 +89,8 @@
         .nav-arrow {
             background: transparent;
             border: none;
-            font-size: 2.5rem;          /* larger */
-            color: #999;                /* gray */
+            font-size: 2.5rem;
+            color: #999;
             cursor: pointer;
             pointer-events: auto;
             line-height: 1;
@@ -169,14 +169,14 @@
             font-style: italic;
         }
 
-        /* Story title page */
+        /* Story title page – now with illustration area */
         .story-title-page {
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: flex-start;
             text-align: center;
-            padding-top: 25%;
+            padding-top: 5%;               /* reduced from 25% */
             height: 100%;
             color: var(--ink);
             background: var(--cream);
@@ -186,7 +186,32 @@
             font-weight: bold;
             letter-spacing: 1px;
             max-width: 90%;
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.3rem;
+        }
+        .story-illustration {
+            flex: 1;
+            width: 90%;
+            margin-top: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            border: 1px dashed var(--sepia);
+            border-radius: 4px;
+            background: var(--cream);
+            position: relative;
+        }
+        .story-illustration img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            display: block;
+        }
+        .illustration-placeholder {
+            font-size: 1rem;
+            color: #bbb;
+            font-style: italic;
+            letter-spacing: 1px;
         }
 
         /* Typography */
@@ -196,7 +221,7 @@
             line-height: 1.6;
             color: var(--ink);
             text-align: justify;
-            white-space: pre-wrap;
+            white-space: pre-wrap !important;   /* ensure line breaks are always honoured */
         }
         .session-label { font-style: italic; color: var(--accent); font-size: 0.75rem; margin-bottom: 0.2rem; display: block; }
         .story-end { text-align: center; font-style: italic; color: var(--accent); margin-top: 0.4rem; font-size: 0.8rem; }
@@ -227,8 +252,6 @@
     const ENDPOINT = 'https://fra.cloud.appwrite.io/v1';
     const EMAIL = 'relaytale@gmail.com';
 
-    // Target 55-60 lines per page. At 1rem font and 1.6 line-height,
-    // each line holds about 55 characters. 55*55=3025, 60*55=3300.
     const MAX_CHARS_PER_PAGE = 3200;
     const ORPHAN_MIN_CHARS = 100;
 
@@ -242,6 +265,11 @@
     const pageNumber = document.getElementById('pageNumber');
     const prevArrow = document.getElementById('prevArrow');
     const nextArrow = document.getElementById('nextArrow');
+
+    // ===== HTML ESCAPE HELPER =====
+    function escapeHtml(text) {
+        return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
 
     // ===== PAGE BUILDERS =====
     function createCoverPage(title, subtitle, includeFetch = false) {
@@ -274,111 +302,71 @@
             </div>`;
     }
 
-    function createStoryTitlePage(title, authors) {
+    function createStoryTitlePage(title, authors, illustrationUrl) {
+        const illustrationHTML = illustrationUrl
+            ? `<div class="story-illustration"><img src="${illustrationUrl}" alt="Illustration"></div>`
+            : `<div class="story-illustration"><span class="illustration-placeholder">Illustration</span></div>`;
         return `
             <div class="story-title-page">
                 <div class="story-title-main">${title}</div>
                 <div class="story-authors">By ${authors}</div>
+                ${illustrationHTML}
             </div>`;
     }
 
-    // ===== PRECISE PAGINATION (55-60 lines) =====
-    function paginateChapters(title, authors, chapters, status) {
+    // ===== PAGINATION (WITH ESCAPING & ILLUSTRATION) =====
+    function paginateChapters(title, authors, chapters, status, illustrationUrl) {
         const pagesForStory = [];
-        pagesForStory.push({ html: createStoryTitlePage(title, authors), isStoryTitle: true });
+        pagesForStory.push({ html: createStoryTitlePage(title, authors, illustrationUrl), isStoryTitle: true });
 
         if (!chapters || chapters.length === 0) return pagesForStory;
 
-        // Build a plain text version to count characters accurately
-        let plainText = '';
-        chapters.forEach(ch => {
-            plainText += `Session ${ch.chapterNumber} — by ${ch.authorName}\n`;
-            plainText += ch.content + '\n\n';
-        });
-
-        // Now split plainText into pages, then map back to HTML segments
-        const htmlSegments = [];
-        chapters.forEach(ch => {
-            htmlSegments.push(`<span class="session-label">Session ${ch.chapterNumber} — by ${ch.authorName}</span>`);
-            htmlSegments.push(ch.content);
-        });
-
-        // We'll iterate through the plain text character by character,
-        // keeping track of which segment we're in.
-        let segIndex = 0;
-        let segOffset = 0; // character offset within current segment (0 = label, 1 = content)
         let currentHtml = '';
         let currentChars = 0;
 
-        function addSegmentToPage(segIdx, offset) {
-            if (offset === 0) {
-                // Label
-                const labelHtml = htmlSegments[segIdx * 2];
-                currentHtml += labelHtml + '\n';
-                currentChars += labelHtml.length + 1;
-                // move to content
-                return { nextSeg: segIdx, nextOffset: 1, remainingChars: plainText.split('\n')[segIdx * 2 + 1]?.length || 0 };
+        for (let i = 0; i < chapters.length; i++) {
+            const ch = chapters[i];
+            const labelText = `Session ${ch.chapterNumber} — by ${ch.authorName}`;
+            const escapedContent = escapeHtml(ch.content);   // <, >, & are safe now
+
+            const segmentHtml = `<span class="session-label">${escapeHtml(labelText)}</span>\n${escapedContent}\n\n`;
+            const segmentChars = escapedContent.length + labelText.length + 3;
+
+            if (currentChars + segmentChars > MAX_CHARS_PER_PAGE && currentChars > 0) {
+                pagesForStory.push({ html: `<div class="story-text">${currentHtml}</div>` });
+                currentHtml = '';
+                currentChars = 0;
+            }
+
+            if (segmentChars > MAX_CHARS_PER_PAGE) {
+                // label fits, content needs splitting
+                currentHtml += `<span class="session-label">${escapeHtml(labelText)}</span>\n`;
+                currentChars += labelText.length + 1;
+                const words = escapedContent.split(/\s+/);
+                let chunk = '', chunkChars = 0;
+                for (const word of words) {
+                    if (chunkChars + word.length + 1 > MAX_CHARS_PER_PAGE && chunkChars > 0) {
+                        currentHtml += chunk;
+                        pagesForStory.push({ html: `<div class="story-text">${currentHtml}</div>` });
+                        currentHtml = '';
+                        currentChars = 0;
+                        chunk = word;
+                        chunkChars = word.length;
+                    } else {
+                        chunk += (chunk ? ' ' : '') + word;
+                        chunkChars += word.length + (chunk ? 1 : 0);
+                    }
+                }
+                if (chunk) {
+                    currentHtml += chunk + '\n\n';
+                    currentChars += chunkChars + 2;
+                }
             } else {
-                // Content
-                const contentHtml = htmlSegments[segIdx * 2 + 1];
-                currentHtml += contentHtml + '\n\n';
-                currentChars += contentHtml.length + 2;
-                // move to next label
-                return { nextSeg: segIdx + 1, nextOffset: 0, remainingChars: 0 };
+                currentHtml += segmentHtml;
+                currentChars += segmentChars;
             }
         }
 
-        let state = { nextSeg: 0, nextOffset: 0 };
-        while (state.nextSeg < chapters.length) {
-            const ch = chapters[state.nextSeg];
-            if (state.nextOffset === 0) {
-                // Add label
-                const labelHtml = htmlSegments[state.nextSeg * 2];
-                const labelChars = labelHtml.length + 1; // +1 for newline
-                if (currentChars + labelChars > MAX_CHARS_PER_PAGE && currentChars > 0) {
-                    // Save page
-                    pagesForStory.push({ html: `<div class="story-text">${currentHtml}</div>` });
-                    currentHtml = '';
-                    currentChars = 0;
-                }
-                currentHtml += labelHtml + '\n';
-                currentChars += labelChars;
-                state.nextOffset = 1; // move to content
-            }
-            if (state.nextOffset === 1) {
-                const contentHtml = htmlSegments[state.nextSeg * 2 + 1];
-                const contentChars = contentHtml.length;
-                if (currentChars + contentChars + 2 > MAX_CHARS_PER_PAGE) { // +2 for double newline
-                    // Content doesn't fit – split it
-                    const words = contentHtml.split(/\s+/);
-                    let chunk = '', chunkChars = 0;
-                    for (const word of words) {
-                        if (chunkChars + word.length + 1 > MAX_CHARS_PER_PAGE && chunkChars > 0) {
-                            currentHtml += chunk;
-                            pagesForStory.push({ html: `<div class="story-text">${currentHtml}</div>` });
-                            currentHtml = '';
-                            currentChars = 0;
-                            chunk = word;
-                            chunkChars = word.length;
-                        } else {
-                            chunk += (chunk ? ' ' : '') + word;
-                            chunkChars += word.length + (chunk ? 1 : 0);
-                        }
-                    }
-                    if (chunk) {
-                        currentHtml += chunk + '\n\n';
-                        currentChars += chunkChars + 2;
-                    }
-                } else {
-                    currentHtml += contentHtml + '\n\n';
-                    currentChars += contentChars + 2;
-                }
-                state.nextSeg++;
-                state.nextOffset = 0;
-            }
-        }
-
-        // Handle any remaining content
         if (currentHtml.trim().length > 0) {
             if (currentChars < ORPHAN_MIN_CHARS && pagesForStory.length > 0) {
                 const lastPage = pagesForStory[pagesForStory.length - 1];
@@ -388,7 +376,6 @@
             }
         }
 
-        // Add end marker + share to last text page
         const lastIdx = pagesForStory.length - 1;
         const safeTitle = title.replace(/'/g, "\\'");
         const endHtml = `<p class="story-end">${status === 'completed' ? '🏁 The End' : '✍️ In Progress'} <span class="share-mini" onclick="shareStory('${safeTitle}')">Share</span></p>`;
@@ -454,6 +441,7 @@
                 const session1 = s1Res.documents.length > 0 ? [s1Res.documents[0]] : [];
                 const isBranching = (story.isBranching === 'true' || story.isBranching === true);
                 const authors = story.writers || story.creatorName;
+                const illustrationUrl = story.illustrationUrl || null;  // from Appwrite
 
                 if (isBranching) {
                     for (const flowId of ['flow1', 'flow2', 'flow3']) {
@@ -466,7 +454,7 @@
                         if (chRes.documents.length === 0) continue;
                         const flowChapters = [...session1, ...chRes.documents];
                         const flowTitle = `${story.title} — ${flowNumber}`;
-                        const storyPages = paginateChapters(flowTitle, authors, flowChapters, story.status);
+                        const storyPages = paginateChapters(flowTitle, authors, flowChapters, story.status, illustrationUrl);
                         newPages.push(...storyPages);
                     }
                 } else {
@@ -474,7 +462,7 @@
                         Appwrite.Query.equal('storyId', story.$id),
                         Appwrite.Query.orderAsc('chapterNumber')
                     ]);
-                    const storyPages = paginateChapters(story.title, authors, chRes.documents, story.status);
+                    const storyPages = paginateChapters(story.title, authors, chRes.documents, story.status, illustrationUrl);
                     newPages.push(...storyPages);
                 }
             }
@@ -494,7 +482,7 @@
     pages = [{ html: createCoverPage('RelayTale', 'Sample Issue', true), isCover: true }];
     showPage(0);
 
-    // ===== KEYBOARD & TOUCH (only horizontal swipes) =====
+    // ===== KEYBOARD & TOUCH =====
     document.addEventListener('keydown', (e) => {
         if (e.key === 'ArrowRight') { e.preventDefault(); nextPage(); }
         if (e.key === 'ArrowLeft') { e.preventDefault(); prevPage(); }
@@ -510,7 +498,6 @@
     pageView.addEventListener('touchend', (e) => {
         const dx = touchStartX - e.changedTouches[0].clientX;
         const dy = touchStartY - e.changedTouches[0].clientY;
-        // Only trigger page turn if horizontal movement is dominant and exceeds threshold
         if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
             e.preventDefault();
             if (dx > 0) nextPage();
