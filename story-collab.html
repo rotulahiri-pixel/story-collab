@@ -525,6 +525,11 @@
     // ========== WRITER'S DESK (with alignment) ==========
     document.getElementById('backToStoryBtn').addEventListener('click', () => { if (currentStoryId) window.goToStory(currentStoryId); });
     const chapterText = document.getElementById('chapterText');
+
+// Live alignment preview while writing
+document.getElementById('alignmentSelect').addEventListener('change', function() {
+    chapterText.style.textAlign = this.value;
+});
     chapterText.addEventListener('input', () => { const w = chapterText.value.trim().split(/\s+/).filter(x=>x.length>0); document.getElementById('wordCountDisplay').textContent = w.length; const p = Math.min((w.length/MAX_WORDS)*100,100); document.getElementById('wordProgress').style.width = p+'%'; document.getElementById('wordProgress').classList.toggle('over-limit', w.length>MAX_WORDS); document.getElementById('wordWarning').classList.toggle('hidden', w.length<=MAX_WORDS); });
     document.getElementById('saveDraftBtn').addEventListener('click', async () => { const c = chapterText.value; document.getElementById('draftStatus').textContent = 'Saving...'; try { const ex = await databases.listDocuments(DATABASE_ID, DRAFTS_COLLECTION, [Appwrite.Query.equal('storyId', currentStoryId), Appwrite.Query.equal('authorId', currentUser.$id)]); const wc = c.trim().split(/\s+/).filter(w=>w.length>0).length; if (ex.documents.length>0) await databases.updateDocument(DATABASE_ID, DRAFTS_COLLECTION, ex.documents[0].$id, { content:c, wordCount:wc, lastModified:new Date().toISOString() }); else await databases.createDocument(DATABASE_ID, DRAFTS_COLLECTION, Appwrite.ID.unique(), { storyId: currentStoryId, authorId: currentUser.$id, content:c, wordCount:wc, lastModified:new Date().toISOString() }); document.getElementById('draftStatus').textContent = 'Draft saved at '+new Date().toLocaleTimeString(); } catch (err) { document.getElementById('draftStatus').textContent = 'Error.'; } });
     document.getElementById('submitChapterBtn').addEventListener('click', async () => {
