@@ -74,7 +74,7 @@
             background: var(--cream);
         }
 
-        /* Larger gray navigation arrows */
+        /* Navigation arrows */
         .nav-arrows {
             position: absolute;
             bottom: 0.8rem;
@@ -169,14 +169,14 @@
             font-style: italic;
         }
 
-        /* Story title page – now with illustration area */
+        /* Story title page with illustration */
         .story-title-page {
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: flex-start;
             text-align: center;
-            padding-top: 5%;               /* reduced from 25% */
+            padding-top: 5%;
             height: 100%;
             color: var(--ink);
             background: var(--cream);
@@ -216,12 +216,9 @@
 
         /* Typography */
         .story-authors { font-size: 0.7rem; font-style: italic; color: var(--accent); margin-top: 0.5rem; }
-        .story-text {
-            font-size: 0.95rem;
-            line-height: 1.6;
-            color: var(--ink);
-            text-align: justify;
-            white-space: pre-wrap !important;   /* ensure line breaks are always honoured */
+        .session-block {
+            white-space: pre-wrap !important;
+            margin-bottom: 1.2rem;
         }
         .session-label { font-style: italic; color: var(--accent); font-size: 0.75rem; margin-bottom: 0.2rem; display: block; }
         .story-end { text-align: center; font-style: italic; color: var(--accent); margin-top: 0.4rem; font-size: 0.8rem; }
@@ -231,7 +228,7 @@
 </head>
 <body>
 <div class="app-container">
-    <div class="book-wrapper" id="bookWrapper">
+    <div class="book-wrapper">
         <div class="page-view" id="pageView">
             <div class="page-content" id="pageContent"></div>
             <div class="nav-arrows">
@@ -314,68 +311,56 @@
             </div>`;
     }
 
-    // ===== PAGINATION (WITH ESCAPING & ILLUSTRATION) =====
+    // ===== NEW PAGINATION (preserves alignment per session) =====
     function paginateChapters(title, authors, chapters, status, illustrationUrl) {
         const pagesForStory = [];
+        // Title page
         pagesForStory.push({ html: createStoryTitlePage(title, authors, illustrationUrl), isStoryTitle: true });
 
         if (!chapters || chapters.length === 0) return pagesForStory;
 
-        let currentHtml = '';
+        // Build an array of session blocks, each with proper HTML and alignment
+        const sessionBlocks = [];
+        for (const ch of chapters) {
+            const alignment = ch.alignment || 'left';
+            const escapedContent = escapeHtml(ch.content);
+            const labelHtml = `<span class="session-label">Session ${ch.chapterNumber} — by ${ch.authorName}</span>`;
+            // Each session is wrapped in a div that preserves whitespace and applies alignment
+            const blockHtml = `<div class="session-block" style="text-align: ${alignment};">${labelHtml}\n${escapedContent}</div>`;
+            // For character counting, we use the plain text length of the session (label + content)
+            const blockText = `Session ${ch.chapterNumber} — by ${ch.authorName}\n${ch.content}`;
+            sessionBlocks.push({ html: blockHtml, textLength: blockText.length });
+        }
+
+        // Now paginate these blocks
+        let currentPageHtml = '';
         let currentChars = 0;
 
-        for (let i = 0; i < chapters.length; i++) {
-            const ch = chapters[i];
-            const labelText = `Session ${ch.chapterNumber} — by ${ch.authorName}`;
-            const escapedContent = escapeHtml(ch.content);   // <, >, & are safe now
-
-            const segmentHtml = `<span class="session-label">${escapeHtml(labelText)}</span>\n${escapedContent}\n\n`;
-            const segmentChars = escapedContent.length + labelText.length + 3;
-
-            if (currentChars + segmentChars > MAX_CHARS_PER_PAGE && currentChars > 0) {
-                pagesForStory.push({ html: `<div class="story-text">${currentHtml}</div>` });
-                currentHtml = '';
+        for (let i = 0; i < sessionBlocks.length; i++) {
+            const block = sessionBlocks[i];
+            // If adding this block would exceed the page limit and we already have content, start a new page
+            if (currentChars + block.textLength > MAX_CHARS_PER_PAGE && currentChars > 0) {
+                pagesForStory.push({ html: `<div class="story-text">${currentPageHtml}</div>` });
+                currentPageHtml = '';
                 currentChars = 0;
             }
-
-            if (segmentChars > MAX_CHARS_PER_PAGE) {
-                // label fits, content needs splitting
-                currentHtml += `<span class="session-label">${escapeHtml(labelText)}</span>\n`;
-                currentChars += labelText.length + 1;
-                const words = escapedContent.split(/\s+/);
-                let chunk = '', chunkChars = 0;
-                for (const word of words) {
-                    if (chunkChars + word.length + 1 > MAX_CHARS_PER_PAGE && chunkChars > 0) {
-                        currentHtml += chunk;
-                        pagesForStory.push({ html: `<div class="story-text">${currentHtml}</div>` });
-                        currentHtml = '';
-                        currentChars = 0;
-                        chunk = word;
-                        chunkChars = word.length;
-                    } else {
-                        chunk += (chunk ? ' ' : '') + word;
-                        chunkChars += word.length + (chunk ? 1 : 0);
-                    }
-                }
-                if (chunk) {
-                    currentHtml += chunk + '\n\n';
-                    currentChars += chunkChars + 2;
-                }
-            } else {
-                currentHtml += segmentHtml;
-                currentChars += segmentChars;
-            }
+            // Add block to current page
+            currentPageHtml += block.html;
+            currentChars += block.textLength;
         }
 
-        if (currentHtml.trim().length > 0) {
+        // Add any remaining content as the last page
+        if (currentPageHtml.trim().length > 0) {
+            // Orphan control: if the last page is very short, merge with previous
             if (currentChars < ORPHAN_MIN_CHARS && pagesForStory.length > 0) {
                 const lastPage = pagesForStory[pagesForStory.length - 1];
-                lastPage.html = lastPage.html.replace('</div>', `\n\n${currentHtml}</div>`);
+                lastPage.html = lastPage.html.replace('</div>', `${currentPageHtml}</div>`);
             } else {
-                pagesForStory.push({ html: `<div class="story-text">${currentHtml}</div>` });
+                pagesForStory.push({ html: `<div class="story-text">${currentPageHtml}</div>` });
             }
         }
 
+        // Add end marker + share to the last text page
         const lastIdx = pagesForStory.length - 1;
         const safeTitle = title.replace(/'/g, "\\'");
         const endHtml = `<p class="story-end">${status === 'completed' ? '🏁 The End' : '✍️ In Progress'} <span class="share-mini" onclick="shareStory('${safeTitle}')">Share</span></p>`;
@@ -423,7 +408,10 @@
             const client = new Appwrite.Client();
             client.setEndpoint(ENDPOINT).setProject(PROJECT_ID);
             const databases = new Appwrite.Databases(client);
-            const storiesRes = await databases.listDocuments(DATABASE_ID, STORIES_COLLECTION);
+            // Only fetch stories marked for magazine
+            const storiesRes = await databases.listDocuments(DATABASE_ID, STORIES_COLLECTION, [
+                Appwrite.Query.equal('publishedToMagazine', 'true')
+            ]);
             if (storiesRes.documents.length === 0) {
                 statusEl.textContent = 'No stories found.';
                 return;
@@ -441,7 +429,7 @@
                 const session1 = s1Res.documents.length > 0 ? [s1Res.documents[0]] : [];
                 const isBranching = (story.isBranching === 'true' || story.isBranching === true);
                 const authors = story.writers || story.creatorName;
-                const illustrationUrl = story.illustrationUrl || null;  // from Appwrite
+                const illustrationUrl = story.illustrationUrl || null;
 
                 if (isBranching) {
                     for (const flowId of ['flow1', 'flow2', 'flow3']) {
@@ -452,6 +440,7 @@
                             Appwrite.Query.orderAsc('chapterNumber')
                         ]);
                         if (chRes.documents.length === 0) continue;
+                        // Prepend Session 1 to this flow's chapters
                         const flowChapters = [...session1, ...chRes.documents];
                         const flowTitle = `${story.title} — ${flowNumber}`;
                         const storyPages = paginateChapters(flowTitle, authors, flowChapters, story.status, illustrationUrl);
@@ -462,6 +451,7 @@
                         Appwrite.Query.equal('storyId', story.$id),
                         Appwrite.Query.orderAsc('chapterNumber')
                     ]);
+                    // All chapters already include session 1
                     const storyPages = paginateChapters(story.title, authors, chRes.documents, story.status, illustrationUrl);
                     newPages.push(...storyPages);
                 }
