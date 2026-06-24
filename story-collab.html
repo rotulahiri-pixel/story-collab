@@ -97,7 +97,6 @@
         <button id="acceptDisclaimerBtn" class="success" style="margin-top:1rem; width:100%;">I Understand & Accept</button>
     </div>
 
-    <!-- Auth Screen -->
     <div id="authScreen">
         <div class="header-section"><h1>📚 RelayTale</h1><p class="tagline">Where writers create stories by turn</p></div>
         <div id="loginForm"><h2>Login</h2>
@@ -119,7 +118,6 @@
         </div>
     </div>
 
-    <!-- Main App -->
     <div id="appScreen" class="hidden">
         <div class="flex-between" style="margin-bottom:0.5rem;">
             <div><h1 style="display:inline;">📚 RelayTale</h1><p class="tagline" style="display:inline; margin-left:1rem;">Where writers create stories by turn</p></div>
@@ -133,10 +131,12 @@
             <div class="flex-between"><h2>Story Index</h2><span id="totalVisits" class="badge">📊 0 visits</span></div>
             <div id="storiesList" class="card-grid"></div>
             <div class="card" style="margin-top:2rem; text-align:center;"><h3>✍️ Want to be a Writer?</h3>
-                <p style="margin:0.5rem 0;">Share your email to request write access.</p>
+                <p style="margin:0.5rem 0;">Share your email and select the story you want to write for.</p>
                 <div class="flex-row" style="justify-content:center;flex-wrap:wrap;">
                     <input type="email" id="writeRequestEmail" placeholder="Your email" style="max-width:300px;">
-                    <select id="writeRequestStory" style="max-width:300px;"><option value="">Select a story (optional)</option></select>
+                    <select id="writeRequestStory" style="max-width:300px;" required>
+                        <option value="" disabled selected>Select a story (required)</option>
+                    </select>
                     <button id="writeRequestBtn" class="warn">Request Write Access</button>
                 </div>
             </div>
@@ -248,7 +248,7 @@
     document.getElementById('registerBtn').addEventListener('click', async () => { if (!requireDisclaimer()) return; const n = document.getElementById('regName').value || 'Writer', e = document.getElementById('regEmail').value, p = document.getElementById('regPassword').value; if (p.length < 8) { alert('Password min 8 chars'); return; } if (!e) { alert('Email required'); return; } try { await account.create(Appwrite.ID.unique(), e, p, n); await account.createEmailSession(e, p); currentUser = await account.get(); currentUser.isGuest = false; currentUser.loginMethod = 'email'; await setUserRole(); showApp(); } catch (err) { alert('Registration failed: ' + err.message); } });
     document.getElementById('logoutBtn').addEventListener('click', async () => { try { await account.deleteSession('current'); } catch (e) {} currentUser = null; currentStoryId = null; currentStory = null; currentFlowId = null; appScreen.classList.add('hidden'); authScreen.classList.remove('hidden'); disclaimerAccepted = false; document.getElementById('disclaimerOverlay').classList.remove('hidden'); document.getElementById('disclaimerPopup').classList.remove('hidden'); loadCompletedStories(); });
 
-    // ========== ROLES ==========
+    // ========== ROLE SYSTEM ==========
     async function setUserRole() {
         currentUser.role = 'writer'; currentUser.canCreate = false; currentUser.canEdit = false; currentUser.canInvite = false; currentUser.canWrite = false;
         currentUser.isSuperAdmin = (currentUser.email === SUPER_ADMIN); currentUser.isCoAdmin = false;
@@ -361,21 +361,27 @@
     async function recordVisit(storyId) { try { await databases.createDocument(DATABASE_ID, VISITS_COLLECTION, Appwrite.ID.unique(), { storyId, visitorId: currentUser ? currentUser.email || currentUser.$id : 'anon', visitedAt: new Date().toISOString() }); } catch (e) {} }
     async function loadTotalVisits() { try { const r = await databases.listDocuments(DATABASE_ID, VISITS_COLLECTION); document.getElementById('totalVisits').textContent = '📊 ' + (r.total || r.documents.length) + ' visits'; } catch (e) { document.getElementById('totalVisits').textContent = '📊 0 visits'; } }
 
-    // ========== WRITE REQUEST ==========
+    // ========== WRITE REQUEST (COMPULSORY STORY) ==========
     async function loadWriteRequestStories() {
         const sel = document.getElementById('writeRequestStory');
         try {
             const r = await databases.listDocuments(DATABASE_ID, STORIES_COLLECTION);
             const active = r.documents.filter(s => s.status === 'active');
-            sel.innerHTML = '<option value="">Select a story (optional)</option>' + active.map(s => `<option value="${s.$id}">${s.title}</option>`).join('');
+            sel.innerHTML = '<option value="" disabled selected>Select a story (required)</option>' + active.map(s => `<option value="${s.$id}">${s.title}</option>`).join('');
         } catch (e) {}
     }
     document.getElementById('writeRequestBtn').addEventListener('click', async () => {
         const email = document.getElementById('writeRequestEmail').value.trim();
-        if (!email) { alert('Enter your email.'); return; }
         const storyId = document.getElementById('writeRequestStory').value;
+        if (!email) { alert('Enter your email.'); return; }
+        if (!storyId) { alert('Please select a story.'); return; }
         try {
-            await databases.createDocument(DATABASE_ID, WRITE_REQUESTS_COLLECTION, Appwrite.ID.unique(), { email, message: 'Requests write access' + (storyId ? ' for story: ' + storyId : ''), createdAt: new Date().toISOString(), storyId: storyId || '' });
+            await databases.createDocument(DATABASE_ID, WRITE_REQUESTS_COLLECTION, Appwrite.ID.unique(), {
+                email,
+                message: 'Requests write access for story: ' + storyId,
+                createdAt: new Date().toISOString(),
+                storyId
+            });
             document.getElementById('writeRequestEmail').value = '';
             alert('Request sent!');
         } catch (err) { alert('Error: ' + err.message); }
@@ -522,14 +528,13 @@
     }
     window.assignTurn = async function(invId, id) { if (currentStory.status==='completed') { alert('Completed.'); return; } try { await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId, { currentWriterId: invId }); const cw = (currentStory.writers||currentStory.creatorName); const nw = cw.split(',').includes(id)?cw:cw+','+id; await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId, { writers: nw }); alert(`Turn to ${id}!`); currentStory = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId); loadStoryView(); loadInvites(); } catch (err) { alert('Error: '+err.message); } };
 
-    // ========== WRITER'S DESK (with alignment) ==========
+    // ========== WRITER'S DESK (with live alignment preview) ==========
     document.getElementById('backToStoryBtn').addEventListener('click', () => { if (currentStoryId) window.goToStory(currentStoryId); });
     const chapterText = document.getElementById('chapterText');
-
-// Live alignment preview while writing
-document.getElementById('alignmentSelect').addEventListener('change', function() {
-    chapterText.style.textAlign = this.value;
-});
+    // Live alignment preview
+    document.getElementById('alignmentSelect').addEventListener('change', function() {
+        chapterText.style.textAlign = this.value;
+    });
     chapterText.addEventListener('input', () => { const w = chapterText.value.trim().split(/\s+/).filter(x=>x.length>0); document.getElementById('wordCountDisplay').textContent = w.length; const p = Math.min((w.length/MAX_WORDS)*100,100); document.getElementById('wordProgress').style.width = p+'%'; document.getElementById('wordProgress').classList.toggle('over-limit', w.length>MAX_WORDS); document.getElementById('wordWarning').classList.toggle('hidden', w.length<=MAX_WORDS); });
     document.getElementById('saveDraftBtn').addEventListener('click', async () => { const c = chapterText.value; document.getElementById('draftStatus').textContent = 'Saving...'; try { const ex = await databases.listDocuments(DATABASE_ID, DRAFTS_COLLECTION, [Appwrite.Query.equal('storyId', currentStoryId), Appwrite.Query.equal('authorId', currentUser.$id)]); const wc = c.trim().split(/\s+/).filter(w=>w.length>0).length; if (ex.documents.length>0) await databases.updateDocument(DATABASE_ID, DRAFTS_COLLECTION, ex.documents[0].$id, { content:c, wordCount:wc, lastModified:new Date().toISOString() }); else await databases.createDocument(DATABASE_ID, DRAFTS_COLLECTION, Appwrite.ID.unique(), { storyId: currentStoryId, authorId: currentUser.$id, content:c, wordCount:wc, lastModified:new Date().toISOString() }); document.getElementById('draftStatus').textContent = 'Draft saved at '+new Date().toLocaleTimeString(); } catch (err) { document.getElementById('draftStatus').textContent = 'Error.'; } });
     document.getElementById('submitChapterBtn').addEventListener('click', async () => {
@@ -588,7 +593,7 @@ document.getElementById('alignmentSelect').addEventListener('change', function()
     }
     async function loadPreviousSessions() { const pl = document.getElementById('prevChaptersList'); const lc = document.getElementById('lastSessionCard'); pl.innerHTML='Loading...'; lc.classList.add('hidden'); try { const q = [Appwrite.Query.equal('storyId', currentStoryId), Appwrite.Query.orderDesc('chapterNumber'), Appwrite.Query.limit(5)]; if (currentFlowId) q.push(Appwrite.Query.equal('flowId', currentFlowId)); const res = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, q); if (res.documents.length===0) { pl.innerHTML='<p>No sessions yet.</p>'; return; } const last = res.documents[0]; lc.classList.remove('hidden'); lc.innerHTML = `<h4>Last Session (${sessionLabel(last)}) — by ${last.authorName}</h4><p style="white-space:pre-wrap;${last.alignment ? 'text-align:'+last.alignment : ''}">${last.content}</p><small>${new Date(last.$createdAt).toLocaleString()}</small>`; pl.innerHTML = res.documents.length>1 ? '<h4>Earlier Sessions:</h4>'+res.documents.slice(1).map(c => `<div class="card" style="padding:0.8rem;font-size:0.85rem;"><strong>${sessionLabel(c)}</strong> — ${c.authorName}: ${c.content.substring(0,80)}...</div>`).join('') : ''; } catch (err) { pl.innerHTML='<p>Error.</p>'; } }
 
-    // ========== DASHBOARD (with push-to-magazine) ==========
+    // ========== DASHBOARD (with order, preview, static download) ==========
     async function loadCreatorDashboard() {
         const le = document.getElementById('creatorStoriesList');
         if (!currentUser || currentUser.isGuest) { le.innerHTML = '<p>Please login.</p>'; return; }
@@ -606,12 +611,16 @@ document.getElementById('alignmentSelect').addEventListener('change', function()
             if (currentUser.canCreate) h += '<button onclick="createNewStory()" class="success">+ Create New Story</button> ';
             h += '<button onclick="dashboardInvite()" class="outline">📨 Grant Write Access</button> ';
             h += '<button onclick="viewWriteRequests()" class="small">📋 View Requests</button> ';
-            if (currentUser.isSuperAdmin) {
+            if (currentUser.isSuperAdmin || currentUser.isCoAdmin) {
                 h += '<button onclick="preApproveCreator()" class="outline small">➕ Pre-approve Creator</button> ';
                 h += '<button onclick="setCoAdmin()" class="outline small">🤝 Set Co-Admin</button> ';
                 h += '<button onclick="viewRecentLogins()" class="small">👥 Recent Logins</button> ';
                 h += '<button onclick="viewArchivedStories()" class="small">📦 Archived</button> ';
+            }
+            if (currentUser.isSuperAdmin) {
                 h += '<button onclick="pushAllCompletedToMagazine()" class="push-btn small">📤 Push All Completed</button> ';
+                h += '<button onclick="previewMagazine()" class="outline small">👀 Preview Magazine</button> ';
+                h += '<button onclick="downloadStaticMagazine()" class="push-btn small">📥 Download Static Magazine</button> ';
             }
             h += '</div>';
 
@@ -631,13 +640,14 @@ document.getElementById('alignmentSelect').addEventListener('change', function()
                     ${!isArch?`<button onclick="goToWriterDeskFromDashboard('${s.$id}')" class="small">✍️ Write</button>${s.status!=='completed'?`<button onclick="completeStory('${s.$id}')" class="danger small">🏁 End</button>`:''}${showArchive?`<button onclick="archiveStory('${s.$id}')" class="warn small">📦 Archive</button>`:''}`:`${showArchive?`<button onclick="unarchiveStory('${s.$id}')" class="success small">📂 Retrieve</button>`:''}`}
                     <button onclick="editStoryDetails('${s.$id}')" class="outline small">✏️ Edit</button>
                     ${currentUser.isSuperAdmin ? `<button onclick="toggleMagazinePublish('${s.$id}')" class="small ${published ? 'success' : 'outline'}">${published ? '✅ Published' : '📤 Publish'}</button>` : ''}
+                    ${currentUser.isSuperAdmin ? `<button onclick="setStoryOrder('${s.$id}')" class="small">🔢 Order</button>` : ''}
                 </div></div>`;
             }).join('');
             le.innerHTML = h;
         } catch (err) { le.innerHTML = '<p>Error: '+err.message+'</p>'; }
     }
 
-    // ========== MAGAZINE PUBLISH FUNCTIONS ==========
+    // ========== MAGAZINE PUBLISH & ORDER ==========
     window.toggleMagazinePublish = async function(storyId) {
         const story = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, storyId);
         const newStatus = story.publishedToMagazine === 'true' ? 'false' : 'true';
@@ -655,7 +665,95 @@ document.getElementById('alignmentSelect').addEventListener('change', function()
         loadCreatorDashboard();
     };
 
-    // ===== REMAINING DASHBOARD ACTIONS (unchanged) =====
+    window.setStoryOrder = async function(storyId) {
+        const order = prompt('Enter sort order (lower number appears first):');
+        if (order === null) return;
+        const num = parseInt(order, 10);
+        if (isNaN(num)) { alert('Please enter a number.'); return; }
+        try {
+            await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, storyId, { sortOrder: num });
+            loadCreatorDashboard();
+        } catch (err) { alert('Error: ' + err.message); }
+    };
+
+    // ========== PREVIEW & STATIC MAGAZINE ==========
+    window.previewMagazine = function() {
+        window.open('https://your-username.github.io/your-repo/magazine.html', '_blank');
+    };
+
+    window.downloadStaticMagazine = async function() {
+        // Fetch all published stories, ordered by sortOrder
+        const client = new Appwrite.Client();
+        client.setEndpoint(APPWRITE_ENDPOINT).setProject(PROJECT_ID);
+        const databases = new Appwrite.Databases(client);
+        const storiesRes = await databases.listDocuments(DATABASE_ID, STORIES_COLLECTION, [
+            Appwrite.Query.equal('publishedToMagazine', 'true'),
+            Appwrite.Query.orderAsc('sortOrder')
+        ]);
+        if (storiesRes.documents.length === 0) {
+            alert('No stories published for magazine.');
+            return;
+        }
+
+        // Build a standalone HTML that contains all the stories
+        // (For simplicity, we'll embed the magazine's styling and use the same layout)
+        // In a full implementation, we would reuse the magazine's CSS & JS functions.
+        // Here we generate a minimal self-contained page.
+        let staticHTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RelayTale Magazine (Static)</title>
+    <style>
+        /* Copy the magazine's CSS here (abbreviated for brevity) */
+        body { font-family: 'Georgia', serif; background: #2c1810; color: #f5f0e8; padding: 2rem; }
+        .story { background: #f5f0e8; color: #2c2416; border-radius: 6px; padding: 2rem; margin: 2rem 0; }
+        .story-title { font-size: 2rem; font-weight: bold; margin-bottom: 0.5rem; }
+        .story-authors { font-style: italic; margin-bottom: 1rem; }
+        .session { margin-bottom: 1.5rem; white-space: pre-wrap; }
+        .session-label { font-weight: bold; display: block; margin-bottom: 0.5rem; }
+        .page-break { page-break-before: always; }
+    </style>
+</head>
+<body>
+    <h1>RelayTale Monthly</h1>
+    <p>Where Writers Create Stories By Turn</p>
+`;
+
+        for (const story of storiesRes.documents) {
+            const chaptersRes = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, [
+                Appwrite.Query.equal('storyId', story.$id),
+                Appwrite.Query.orderAsc('chapterNumber')
+            ]);
+            staticHTML += `<div class="story">`;
+            staticHTML += `<div class="story-title">${story.title}</div>`;
+            staticHTML += `<div class="story-authors">By ${story.writers || story.creatorName}</div>`;
+            for (const ch of chaptersRes.documents) {
+                const alignment = ch.alignment || 'left';
+                staticHTML += `<div class="session" style="text-align: ${alignment};">`;
+                staticHTML += `<span class="session-label">Session ${ch.chapterNumber} — by ${ch.authorName}</span>`;
+                staticHTML += ch.content;
+                staticHTML += `</div>`;
+            }
+            staticHTML += `</div>`;
+        }
+
+        staticHTML += `</body></html>`;
+
+        // Trigger download
+        const blob = new Blob([staticHTML], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'relaytale-magazine-static.html';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
+    // ===== REMAINING DASHBOARD ACTIONS =====
     window.dashboardInvite = function() { const email = prompt("Gmail to grant write access to:"); if (!email) return; (async () => { try { await databases.createDocument(DATABASE_ID, INVITATIONS_COLLECTION, Appwrite.ID.unique(), { storyId: '', email, status: 'accepted', turnOrder: 1, invitedBy: currentUser.$id }); alert(`✅ Write access granted to ${email}!`); } catch (err) { alert('Error: '+err.message); } })(); };
     window.createNewStory = function() { if (!currentUser || currentUser.isGuest) { alert('Login first.'); return; } if (!currentUser.canCreate) { alert('Only Admins, Co‑Admins, and Creators can create stories.'); return; } const t = prompt("Story title:"); if (!t) return; const g = prompt("Genre:")||''; const d = prompt("Description:")||''; const p = prompt("Set access password:")||''; (async () => { try { await databases.createDocument(DATABASE_ID, STORIES_COLLECTION, Appwrite.ID.unique(), { title:t, genre:g, description:d, creatorId:currentUser.$id, creatorName:currentUser.name, editorId:'', coAdminId:'', status:'active', currentWriterId:currentUser.$id, lastWriterId:'', turnExpires:'', completedAt:'', accessPassword:p, writers:currentUser.name, admins:'', isBranching:'false', branchingStage:'none', publishedToMagazine:'false' }); alert('Story created!'); loadCreatorDashboard(); loadStories(); } catch (err) { alert('Error: '+err.message); } })(); };
     window.preApproveCreator = function() { const e = prompt("Gmail to pre-approve:"); if (!e) return; (async () => { try { await databases.createDocument(DATABASE_ID, CREATORS_COLLECTION, Appwrite.ID.unique(), { email:e, status:'active' }); alert(e+' added as Creator.'); } catch (err) { alert('Error: '+err.message); } })(); };
