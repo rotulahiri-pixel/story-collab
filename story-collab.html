@@ -97,6 +97,7 @@
         <button id="acceptDisclaimerBtn" class="success" style="margin-top:1rem; width:100%;">I Understand & Accept</button>
     </div>
 
+    <!-- Auth Screen -->
     <div id="authScreen">
         <div class="header-section"><h1>📚 RelayTale</h1><p class="tagline">Where writers create stories by turn</p></div>
         <div id="loginForm"><h2>Login</h2>
@@ -118,6 +119,7 @@
         </div>
     </div>
 
+    <!-- Main App -->
     <div id="appScreen" class="hidden">
         <div class="flex-between" style="margin-bottom:0.5rem;">
             <div><h1 style="display:inline;">📚 RelayTale</h1><p class="tagline" style="display:inline; margin-left:1rem;">Where writers create stories by turn</p></div>
@@ -682,7 +684,12 @@
     };
 
     window.downloadStaticMagazine = async function() {
-        // Fetch all published stories, ordered by sortOrder
+        // Prompt for heading and subheading
+        const heading = prompt('Magazine heading:', 'RelayTale Monthly') || 'RelayTale Monthly';
+        const subheading = prompt('Magazine subheading:', 'Where Writers Create Stories By Turn') || 'Where Writers Create Stories By Turn';
+        const background = prompt('Background style: "leather" or "scroll"', 'leather');
+        const bgStyle = (background === 'scroll') ? 'scroll' : 'leather';
+
         const client = new Appwrite.Client();
         client.setEndpoint(APPWRITE_ENDPOINT).setProject(PROJECT_ID);
         const databases = new Appwrite.Databases(client);
@@ -695,30 +702,110 @@
             return;
         }
 
-        // Build a standalone HTML that contains all the stories
-        // (For simplicity, we'll embed the magazine's styling and use the same layout)
-        // In a full implementation, we would reuse the magazine's CSS & JS functions.
-        // Here we generate a minimal self-contained page.
+        // Build static HTML
         let staticHTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RelayTale Magazine (Static)</title>
+    <title>${heading}</title>
     <style>
-        /* Copy the magazine's CSS here (abbreviated for brevity) */
-        body { font-family: 'Georgia', serif; background: #2c1810; color: #f5f0e8; padding: 2rem; }
-        .story { background: #f5f0e8; color: #2c2416; border-radius: 6px; padding: 2rem; margin: 2rem 0; }
-        .story-title { font-size: 2rem; font-weight: bold; margin-bottom: 0.5rem; }
-        .story-authors { font-style: italic; margin-bottom: 1rem; }
-        .session { margin-bottom: 1.5rem; white-space: pre-wrap; }
-        .session-label { font-weight: bold; display: block; margin-bottom: 0.5rem; }
-        .page-break { page-break-before: always; }
+        body {
+            font-family: 'Georgia', 'Times New Roman', serif;
+            background: #2c1810;
+            color: #f5f0e8;
+            padding: 2rem;
+            display: flex;
+            justify-content: center;
+        }
+        .magazine-wrapper {
+            max-width: 550px;
+            width: 100%;
+        }
+        h1 {
+            text-align: center;
+            font-size: 2.8rem;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            color: #b8860b;
+            text-shadow: 2px 2px 0 rgba(0,0,0,0.5);
+            margin-bottom: 0.5rem;
+        }
+        .subheading {
+            text-align: center;
+            font-style: italic;
+            color: #e8dcc8;
+            margin-bottom: 2rem;
+        }
+        .story {
+            margin-bottom: 3rem;
+            padding: 2rem;
+            border-radius: 6px;
+            position: relative;
+        }
+        /* Leather background (default) */
+        .leather {
+            background: linear-gradient(135deg, #5a2d1a 0%, #3c1e0f 40%, #2a1005 100%);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            color: #f5f0e8;
+        }
+        /* Scroll background */
+        .scroll {
+            background: #f5f0e8;
+            color: #2c2416;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><filter id="noise"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="4" stitchTiles="stitch"/></filter><rect width="100" height="100" filter="url(%23noise)" opacity="0.08"/></svg>');
+            border: 1px solid #d4c5a9;
+        }
+        .scroll::before, .scroll::after {
+            content: '';
+            position: absolute;
+            left: 0; right: 0;
+            height: 10px;
+            background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 10"><path d="M0,5 Q10,0 20,5 T40,5 T60,5 T80,5 T100,5 T120,5 T140,5 T160,5 T180,5 T200,5" fill="none" stroke="%23d4c5a9" stroke-width="1"/></svg>') repeat-x;
+            opacity: 0.5;
+        }
+        .scroll::before { top: -8px; }
+        .scroll::after { bottom: -8px; }
+        .story-title {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 0.3rem;
+            text-align: center;
+        }
+        .story-authors {
+            font-style: italic;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            opacity: 0.8;
+        }
+        .session {
+            margin-bottom: 1.5rem;
+            white-space: pre-wrap;
+        }
+        .session-label {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 0.5rem;
+            font-style: italic;
+            opacity: 0.8;
+        }
+        .story-end {
+            text-align: center;
+            font-style: italic;
+            margin-top: 1rem;
+            opacity: 0.7;
+        }
+        @media print {
+            body { background: white; }
+            .story { box-shadow: none; }
+        }
     </style>
 </head>
 <body>
-    <h1>RelayTale Monthly</h1>
-    <p>Where Writers Create Stories By Turn</p>
+    <div class="magazine-wrapper">
+        <h1>${heading}</h1>
+        <p class="subheading">${subheading}</p>
 `;
 
         for (const story of storiesRes.documents) {
@@ -726,20 +813,34 @@
                 Appwrite.Query.equal('storyId', story.$id),
                 Appwrite.Query.orderAsc('chapterNumber')
             ]);
-            staticHTML += `<div class="story">`;
+            const chapters = chaptersRes.documents;
+            if (chapters.length === 0) continue;
+
+            staticHTML += `<div class="story ${bgStyle}">`;
             staticHTML += `<div class="story-title">${story.title}</div>`;
             staticHTML += `<div class="story-authors">By ${story.writers || story.creatorName}</div>`;
-            for (const ch of chaptersRes.documents) {
+
+            // Smart session labels
+            let prevAuthor = null;
+            for (let i = 0; i < chapters.length; i++) {
+                const ch = chapters[i];
                 const alignment = ch.alignment || 'left';
-                staticHTML += `<div class="session" style="text-align: ${alignment};">`;
-                staticHTML += `<span class="session-label">Session ${ch.chapterNumber} — by ${ch.authorName}</span>`;
-                staticHTML += ch.content;
-                staticHTML += `</div>`;
+                const currentAuthor = ch.authorName;
+                // Show label only if first session or author changed
+                if (i === 0 || currentAuthor !== prevAuthor) {
+                    staticHTML += `<div class="session" style="text-align: ${alignment};"><span class="session-label">Session ${ch.chapterNumber} — by ${ch.authorName}</span>\n${ch.content}</div>`;
+                } else {
+                    staticHTML += `<div class="session" style="text-align: ${alignment};">${ch.content}</div>`;
+                }
+                prevAuthor = currentAuthor;
             }
+
+            // End marker
+            staticHTML += `<div class="story-end">${story.status === 'completed' ? '🏁 The End' : '✍️ In Progress'}</div>`;
             staticHTML += `</div>`;
         }
 
-        staticHTML += `</body></html>`;
+        staticHTML += `</div></body></html>`;
 
         // Trigger download
         const blob = new Blob([staticHTML], { type: 'text/html' });
