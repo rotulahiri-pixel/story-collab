@@ -24,7 +24,7 @@
         .form-group { margin-bottom: 1rem; }
         input, textarea, select { width: 100%; padding: 0.6rem; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; }
         textarea { resize: vertical; }
-        .card { background: white; border-radius: 12px; padding: 1.2rem; margin: 1rem 0; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .card { background: white; border-radius: 12px; padding: 1.2rem; margin: 1rem 0; box-shadow: 0 2px 8px rgba(0,0,0,0.06); min-height: 200px; } /* consistent card height */
         .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
         @media (max-width: 600px) { .card-grid { grid-template-columns: 1fr; } }
         .word-counter { display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.5rem; }
@@ -474,7 +474,7 @@
     window.closeReadMode = function() { document.getElementById('backToIndexBtn').classList.remove('hidden'); document.getElementById('readModeBtn').classList.remove('hidden'); document.getElementById('storyActionArea').classList.remove('hidden'); document.getElementById('sessionOneCard').classList.remove('hidden'); loadStoryView(); };
     function sessionLabel(ch) { return ch.flowId ? `Session ${ch.chapterNumber}/${ch.flowId.slice(-1)}` : `Session ${ch.chapterNumber}`; }
 
-    // ========== STORY VIEW (unchanged, but per‑flow completion button added in dashboard) ==========
+    // ========== STORY VIEW (unchanged) ==========
     document.getElementById('backToIndexBtn').addEventListener('click', () => { currentFlowId = null; goToLanding(); });
     async function loadStoryView() {
         document.getElementById('chaptersContainer').innerHTML = 'Loading...'; document.getElementById('storyActionArea').innerHTML = ''; document.getElementById('branchingArea').classList.add('hidden'); document.getElementById('sessionOneCard').classList.add('hidden');
@@ -638,7 +638,7 @@
     }
     async function loadPreviousSessions() { const pl = document.getElementById('prevChaptersList'); const lc = document.getElementById('lastSessionCard'); pl.innerHTML='Loading...'; lc.classList.add('hidden'); try { const q = [Appwrite.Query.equal('storyId', currentStoryId), Appwrite.Query.orderDesc('chapterNumber'), Appwrite.Query.limit(5)]; if (currentFlowId) q.push(Appwrite.Query.equal('flowId', currentFlowId)); const res = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, q); if (res.documents.length===0) { pl.innerHTML='<p>No sessions yet.</p>'; return; } const last = res.documents[0]; lc.classList.remove('hidden'); lc.innerHTML = `<h4>Last Session (${sessionLabel(last)}) — by ${last.authorName}</h4><p style="white-space:pre-wrap;${last.alignment ? 'text-align:'+last.alignment : ''}">${last.content}</p><small>${new Date(last.$createdAt).toLocaleString()}</small>`; pl.innerHTML = res.documents.length>1 ? '<h4>Earlier Sessions:</h4>'+res.documents.slice(1).map(c => `<div class="card" style="padding:0.8rem;font-size:0.85rem;"><strong>${sessionLabel(c)}</strong> — ${c.authorName}: ${c.content.substring(0,80)}...</div>`).join('') : ''; } catch (err) { pl.innerHTML='<p>Error.</p>'; } }
 
-    // ========== DASHBOARD (with per‑flow completion, order display) ==========
+    // ========== DASHBOARD (with per‑flow completion, order display, consistent card size) ==========
     async function loadCreatorDashboard() {
         const le = document.getElementById('creatorStoriesList');
         if (!currentUser || currentUser.isGuest) { le.innerHTML = '<p>Please login.</p>'; return; }
@@ -677,6 +677,7 @@
                 const showArchive = currentUser.isSuperAdmin || currentUser.isCoAdmin;
                 const published = s.publishedToMagazine === 'true';
                 const sortOrder = s.sortOrder !== undefined ? s.sortOrder : '–';
+                const completedFlows = s.completedFlows ? s.completedFlows.split(',') : [];
                 return `<div class="card"><div class="flex-between"><h3>${s.title}${br}</h3><span class="badge ${isArch?'status-archived':(s.status==='completed'?'status-completed':'status-active')}">${isArch?'📦 Archived':(s.status==='completed'?'✓ Completed':'✍️ In Progress')}</span></div>
                 <p style="font-size:0.8rem;color:#7f8c8d;">Creator: ${s.creatorName}</p>
                 <p style="font-size:0.8rem;">Genre: ${s.genre||'None'} | Writers: ${s.writers||s.creatorName}</p>
@@ -687,17 +688,24 @@
                     <button onclick="editStoryDetails('${s.$id}')" class="outline small">✏️ Edit</button>
                     ${currentUser.isSuperAdmin ? `<button onclick="toggleMagazinePublish('${s.$id}')" class="small ${published ? 'success' : 'outline'}">${published ? '✅ Published' : '📤 Publish'}</button>` : ''}
                     ${currentUser.isSuperAdmin ? `<button onclick="setStoryOrder('${s.$id}')" class="small">🔢 Order (${sortOrder})</button>` : ''}
-                </div>`;
+                </div>
+                ${br && !isArch && (isOwner || currentUser.isSuperAdmin || currentUser.isCoAdmin) ? `<div class="flex-row" style="margin-top:0.5rem;">
+                    <strong style="font-size:0.8rem;">End individual flows:</strong>
+                    ${FLOW_IDS.map(f => {
+                        const done = completedFlows.includes(f);
+                        return `<button onclick="completeFlow('${s.$id}','${f}')" class="small ${done ? 'success' : 'outline'}" ${done ? 'disabled' : ''}>${done ? '✓' : ''} Flow ${f.slice(-1)}</button>`;
+                    }).join('')}
+                </div>` : ''}
+            </div>`;
             }).join('');
             le.innerHTML = h;
         } catch (err) { le.innerHTML = '<p>Error: '+err.message+'</p>'; }
     }
 
-    // ========== PER‑FLOW COMPLETION (new) ==========
+    // ========== PER‑FLOW COMPLETION ==========
     window.completeFlow = async function(storyId, flowId) {
         if (!confirm(`Mark ${FLOW_NAMES[flowId]} as completed?`)) return;
         try {
-            // Add flow to completedFlows array (create attribute if needed)
             const story = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, storyId);
             let completedFlows = story.completedFlows ? story.completedFlows.split(',') : [];
             if (!completedFlows.includes(flowId)) {
@@ -747,7 +755,7 @@
         } catch (err) { alert('Error: ' + err.message); }
     };
 
-    // ========== PREVIEW & STATIC MAGAZINE (UPDATED) ==========
+    // ========== PREVIEW & STATIC MAGAZINE (UPDATED WITH PARCHMENT, CORRECT FLOW NUMBERS, BRANCHED SEPARATION, SMART LABELS) ==========
     window.previewMagazine = function() {
         window.open('https://your-username.github.io/your-repo/magazine.html', '_blank');
     };
@@ -756,8 +764,8 @@
         // Prompt for heading and subheading
         const heading = prompt('Magazine heading:', 'RelayTale Monthly') || 'RelayTale Monthly';
         const subheading = prompt('Magazine subheading:', 'Where Writers Create Stories By Turn') || 'Where Writers Create Stories By Turn';
-        const background = prompt('Background style: "leather" or "scroll"', 'leather');
-        const bgStyle = (background === 'scroll') ? 'scroll' : 'leather';
+        const background = prompt('Background style: "leather" or "parchment"', 'leather');
+        const bgStyle = (background === 'parchment') ? 'parchment' : 'leather';
 
         const client = new Appwrite.Client();
         client.setEndpoint(APPWRITE_ENDPOINT).setProject(PROJECT_ID);
@@ -818,24 +826,29 @@
             box-shadow: 0 4px 20px rgba(0,0,0,0.5);
             color: #f5f0e8;
         }
-        /* Scroll background – improved */
-        .scroll {
-            background: #f5f0e8;
-            color: #2c2416;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><filter id="noise"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="4" stitchTiles="stitch"/></filter><rect width="100" height="100" filter="url(%23noise)" opacity="0.08"/></svg>');
-            border: 2px solid #d4c5a9;
+        /* Parchment background */
+        .parchment {
+            background: #f5e6c8;
+            color: #3c2416;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5), inset 0 0 40px rgba(139,69,19,0.1);
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><filter id="noise"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="4" stitchTiles="stitch"/></filter><rect width="100" height="100" filter="url(%23noise)" opacity="0.12"/></svg>');
+            border: 2px solid #c4a46c;
+            border-radius: 8px;
         }
-        .scroll::before, .scroll::after {
+        .parchment::before {
             content: '';
             position: absolute;
-            left: 0; right: 0;
-            height: 15px;
-            background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 15"><path d="M0,7 Q10,0 20,7 T40,7 T60,7 T80,7 T100,7 T120,7 T140,7 T160,7 T180,7 T200,7" fill="none" stroke="%23d4c5a9" stroke-width="2"/></svg>') repeat-x;
-            opacity: 0.8;
+            top: -10px; left: 5%; right: 5%; height: 20px;
+            background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 20"><path d="M0,10 Q10,0 20,10 T40,10 T60,10 T80,10 T100,10 T120,10 T140,10 T160,10 T180,10 T200,10" fill="none" stroke="%23c4a46c" stroke-width="2"/></svg>') repeat-x;
+            opacity: 0.6;
         }
-        .scroll::before { top: -12px; }
-        .scroll::after { bottom: -12px; }
+        .parchment::after {
+            content: '';
+            position: absolute;
+            bottom: -10px; left: 5%; right: 5%; height: 20px;
+            background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 20"><path d="M0,10 Q10,0 20,10 T40,10 T60,10 T80,10 T100,10 T120,10 T140,10 T160,10 T180,10 T200,10" fill="none" stroke="%23c4a46c" stroke-width="2"/></svg>') repeat-x;
+            opacity: 0.6;
+        }
         .story-title {
             font-size: 2rem;
             font-weight: bold;
@@ -864,13 +877,6 @@
             font-style: italic;
             margin-top: 1rem;
             opacity: 0.7;
-        }
-        .flow-heading {
-            font-size: 1.3rem;
-            font-weight: bold;
-            margin-top: 2rem;
-            margin-bottom: 1rem;
-            text-align: center;
         }
         @media print {
             body { background: white; }
@@ -904,7 +910,7 @@
                     const allFlowChapters = session1 ? [session1, ...flowChapters] : flowChapters;
 
                     staticHTML += `<div class="story ${bgStyle}">`;
-                    staticHTML += `<div class="story-title">${story.title} – ${FLOW_NAMES[flowId].slice(-1)}</div>`;
+                    staticHTML += `<div class="story-title">${story.title} – ${flowId.slice(-1)}</div>`;
                     staticHTML += `<div class="story-authors">By ${story.writers || story.creatorName}</div>`;
 
                     let prevAuthor = null;
