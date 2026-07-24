@@ -411,7 +411,7 @@
     window.closePopup = function() { document.getElementById('popupOverlay').classList.add('hidden'); document.getElementById('popupContent').classList.add('hidden'); };
     document.getElementById('popupOverlay').addEventListener('click', window.closePopup);
 
-    // ========== READ MODE (BRANCHED + FLOW SELECTION) ==========
+    // ========== READ MODE (FIXED DUPLICATE ISSUE) ==========
     document.getElementById('readModeBtn').addEventListener('click', () => loadReadMode(currentFlowId));
 
     async function loadReadMode(flowId) {
@@ -419,7 +419,7 @@
             const story = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId);
             let html = `<div class="book-view"><h2>${story.title}${flowId ? ' — ' + FLOW_NAMES[flowId] : ''}</h2><p style="text-align:center;color:#7f8c8d;margin-bottom:2rem;">By ${story.writers || story.creatorName}</p>`;
 
-            // Session 1 always first
+            // Session 1 always first (only if no flow selected, or if flow selected, show it once)
             const s1Res = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, [
                 Appwrite.Query.equal('storyId', currentStoryId),
                 Appwrite.Query.equal('chapterNumber', 1)
@@ -439,6 +439,7 @@
                     });
                     html += '</div>';
                 } else {
+                    // Only fetch sessions of the selected flow (excluding session 1, which is already shown)
                     const chRes = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, [
                         Appwrite.Query.equal('storyId', currentStoryId),
                         Appwrite.Query.equal('flowId', flowId),
@@ -573,7 +574,7 @@
     }
     window.assignTurn = async function(invId, id) { if (currentStory.status==='completed') { alert('Completed.'); return; } try { await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId, { currentWriterId: invId }); const cw = (currentStory.writers||currentStory.creatorName); const nw = cw.split(',').includes(id)?cw:cw+','+id; await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId, { writers: nw }); alert(`Turn to ${id}!`); currentStory = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId); loadStoryView(); loadInvites(); } catch (err) { alert('Error: '+err.message); } };
 
-    // ========== WRITER'S DESK (with live alignment preview) ==========
+    // ========== WRITER'S DESK (with flow completion check) ==========
     document.getElementById('backToStoryBtn').addEventListener('click', () => { if (currentStoryId) window.goToStory(currentStoryId); });
     const chapterText = document.getElementById('chapterText');
     // Live alignment preview
@@ -585,6 +586,12 @@
     document.getElementById('submitChapterBtn').addEventListener('click', async () => {
         if (!currentStoryId) { alert('No story.'); return; }
         if (currentStory.status==='completed') { alert('Completed.'); return; }
+        // Check if this flow is completed
+        const completedFlows = currentStory.completedFlows ? currentStory.completedFlows.split(',') : [];
+        if (currentFlowId && completedFlows.includes(currentFlowId)) {
+            alert('This flow is already completed. You cannot submit new sessions.');
+            return;
+        }
         const c = chapterText.value.trim();
         if (!c) { alert('Write something.'); return; }
         const wc = c.split(/\s+/).filter(w=>w.length>0).length;
@@ -613,8 +620,15 @@
     });
     async function loadWriterDesk() {
         if (!currentStory) { try { currentStory = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId); } catch (e) { alert('Error'); goToLanding(); return; } }
-        if (currentStory.status==='completed') { alert('Completed.'); window.goToStory(currentStoryId); return; }
+        if (currentStory.status==='completed') { alert('This story is completed.'); window.goToStory(currentStoryId); return; }
         if (currentStory.status==='archived') { alert('Archived.'); window.goToStory(currentStoryId); return; }
+        // Check if the current flow is completed
+        const completedFlows = currentStory.completedFlows ? currentStory.completedFlows.split(',') : [];
+        if (currentFlowId && completedFlows.includes(currentFlowId)) {
+            alert('This flow is completed. Writing is no longer possible.');
+            window.goToStory(currentStoryId);
+            return;
+        }
         const canManage = currentUser && (currentUser.isSuperAdmin || currentUser.isCoAdmin || currentUser.$id===currentStory.creatorId);
         const hasTurn = currentUser && currentUser.$id===currentStory.currentWriterId;
         let hasInvite = false;
@@ -967,6 +981,8 @@
                     const storyAuthors = (story.writers || story.creatorName).split(',').map(w=>w.trim());
                     const uniqueAuthorsInFlow = new Set(allFlowChapters.map(c=>c.authorName.trim()));
                     const allSameAuthor = storyAuthors.length === 1 && uniqueAuthorsInFlow.size === 1 && uniqueAuthorsInFlow.has(storyAuthors[0]);
+                    // Single session check: if there's only one chapter, no label needed
+                    const singleSession = allFlowChapters.length === 1;
 
                     staticHTML += `<div class="story ${bgStyle}">`;
                     staticHTML += `<div class="story-title">${story.title} – ${flowId.slice(-1)}</div>`;
@@ -977,8 +993,11 @@
                         const ch = allFlowChapters[i];
                         const alignment = ch.alignment || 'left';
                         const currentAuthor = ch.authorName.trim();
-                        // If all same author, skip session label completely
-                        if (allSameAuthor) {
+                        // If single session, no label at all
+                        if (singleSession) {
+                            staticHTML += `<div class="session" style="text-align: ${alignment};">${ch.content}</div>`;
+                        } else if (allSameAuthor) {
+                            // All same author – no session labels, just show content
                             staticHTML += `<div class="session" style="text-align: ${alignment};">${ch.content}</div>`;
                         } else if (i === 0 || currentAuthor !== prevAuthor) {
                             staticHTML += `<div class="session" style="text-align: ${alignment};"><span class="session-label">Session ${ch.chapterNumber}/${flowId.slice(-1)} — by ${ch.authorName}</span>\n${ch.content}</div>`;
@@ -995,6 +1014,7 @@
                 const storyAuthors = (story.writers || story.creatorName).split(',').map(w=>w.trim());
                 const uniqueAuthors = new Set(chapters.map(c=>c.authorName.trim()));
                 const allSameAuthor = storyAuthors.length === 1 && uniqueAuthors.size === 1 && uniqueAuthors.has(storyAuthors[0]);
+                const singleSession = chapters.length === 1;
 
                 staticHTML += `<div class="story ${bgStyle}">`;
                 staticHTML += `<div class="story-title">${story.title}</div>`;
@@ -1005,7 +1025,9 @@
                     const ch = chapters[i];
                     const alignment = ch.alignment || 'left';
                     const currentAuthor = ch.authorName.trim();
-                    if (allSameAuthor) {
+                    if (singleSession) {
+                        staticHTML += `<div class="session" style="text-align: ${alignment};">${ch.content}</div>`;
+                    } else if (allSameAuthor) {
                         staticHTML += `<div class="session" style="text-align: ${alignment};">${ch.content}</div>`;
                     } else if (i === 0 || currentAuthor !== prevAuthor) {
                         staticHTML += `<div class="session" style="text-align: ${alignment};"><span class="session-label">Session ${ch.chapterNumber} — by ${ch.authorName}</span>\n${ch.content}</div>`;
