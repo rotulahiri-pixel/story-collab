@@ -411,7 +411,7 @@
     window.closePopup = function() { document.getElementById('popupOverlay').classList.add('hidden'); document.getElementById('popupContent').classList.add('hidden'); };
     document.getElementById('popupOverlay').addEventListener('click', window.closePopup);
 
-    // ========== READ MODE (FIXED DUPLICATE ISSUE) ==========
+    // ========== READ MODE (FIXED DUPLICATE SESSIONS + EDITABLE SESSION 1) ==========
     document.getElementById('readModeBtn').addEventListener('click', () => loadReadMode(currentFlowId));
 
     async function loadReadMode(flowId) {
@@ -419,7 +419,7 @@
             const story = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId);
             let html = `<div class="book-view"><h2>${story.title}${flowId ? ' — ' + FLOW_NAMES[flowId] : ''}</h2><p style="text-align:center;color:#7f8c8d;margin-bottom:2rem;">By ${story.writers || story.creatorName}</p>`;
 
-            // Session 1 always first (only if no flow selected, or if flow selected, show it once)
+            // Session 1 always first
             const s1Res = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, [
                 Appwrite.Query.equal('storyId', currentStoryId),
                 Appwrite.Query.equal('chapterNumber', 1)
@@ -439,16 +439,17 @@
                     });
                     html += '</div>';
                 } else {
-                    // Only fetch sessions of the selected flow (excluding session 1, which is already shown)
                     const chRes = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, [
                         Appwrite.Query.equal('storyId', currentStoryId),
                         Appwrite.Query.equal('flowId', flowId),
                         Appwrite.Query.orderAsc('chapterNumber')
                     ]);
-                    if (chRes.documents.length === 0) {
+                    // Filter out Session 1 (it's already displayed)
+                    const flowChapters = chRes.documents.filter(c => c.chapterNumber !== 1);
+                    if (flowChapters.length === 0) {
                         html += '<p style="text-align:center;margin-top:1rem;">No sessions in this flow yet.</p>';
                     } else {
-                        chRes.documents.forEach(c => {
+                        flowChapters.forEach(c => {
                             html += `<div class="session"><p class="session-author">${sessionLabel(c)} — ${c.authorName}</p><p style="white-space:pre-wrap;${c.alignment ? 'text-align:'+c.alignment : ''}">${c.content}</p></div>`;
                         });
                     }
@@ -475,7 +476,7 @@
     window.closeReadMode = function() { document.getElementById('backToIndexBtn').classList.remove('hidden'); document.getElementById('readModeBtn').classList.remove('hidden'); document.getElementById('storyActionArea').classList.remove('hidden'); document.getElementById('sessionOneCard').classList.remove('hidden'); loadStoryView(); };
     function sessionLabel(ch) { return ch.flowId ? `Session ${ch.chapterNumber}/${ch.flowId.slice(-1)}` : `Session ${ch.chapterNumber}`; }
 
-    // ========== STORY VIEW (unchanged) ==========
+    // ========== STORY VIEW (EDIT BUTTON FOR SESSION 1) ==========
     document.getElementById('backToIndexBtn').addEventListener('click', () => { currentFlowId = null; goToLanding(); });
     async function loadStoryView() {
         document.getElementById('chaptersContainer').innerHTML = 'Loading...'; document.getElementById('storyActionArea').innerHTML = ''; document.getElementById('branchingArea').classList.add('hidden'); document.getElementById('sessionOneCard').classList.add('hidden');
@@ -491,11 +492,12 @@
             const totalChapters = allCh.documents.length;
             if (isBranching && !currentFlowId) currentFlowId = 'flow1';
 
-            // Session 1
+            // Session 1 (with edit button)
             const s1 = allCh.documents.filter(c => c.chapterNumber === 1);
             if (s1.length) {
                 document.getElementById('sessionOneCard').classList.remove('hidden');
-                document.getElementById('sessionOneCard').innerHTML = `<h4>Session 1 — by ${s1[0].authorName}</h4><p style="white-space:pre-wrap;${s1[0].alignment ? 'text-align:'+s1[0].alignment : ''}">${s1[0].content}</p><small>${new Date(s1[0].$createdAt).toLocaleString()}</small>`;
+                const s1Doc = s1[0];
+                document.getElementById('sessionOneCard').innerHTML = `<div class="flex-between"><h4>Session 1 — by ${s1Doc.authorName}</h4>${canManage ? `<button class="small outline" onclick="editSessionFullscreen('${s1Doc.$id}','${currentStoryId}')">✏️ Edit</button>` : ''}</div><p style="white-space:pre-wrap;${s1Doc.alignment ? 'text-align:'+s1Doc.alignment : ''}">${s1Doc.content}</p><small>${new Date(s1Doc.$createdAt).toLocaleString()}</small>`;
             }
 
             let likeCount = 0, userLiked = false;
@@ -574,7 +576,7 @@
     }
     window.assignTurn = async function(invId, id) { if (currentStory.status==='completed') { alert('Completed.'); return; } try { await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId, { currentWriterId: invId }); const cw = (currentStory.writers||currentStory.creatorName); const nw = cw.split(',').includes(id)?cw:cw+','+id; await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId, { writers: nw }); alert(`Turn to ${id}!`); currentStory = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId); loadStoryView(); loadInvites(); } catch (err) { alert('Error: '+err.message); } };
 
-    // ========== WRITER'S DESK (with flow completion check) ==========
+    // ========== WRITER'S DESK (CHECKS FOR COMPLETED FLOWS) ==========
     document.getElementById('backToStoryBtn').addEventListener('click', () => { if (currentStoryId) window.goToStory(currentStoryId); });
     const chapterText = document.getElementById('chapterText');
     // Live alignment preview
@@ -586,12 +588,6 @@
     document.getElementById('submitChapterBtn').addEventListener('click', async () => {
         if (!currentStoryId) { alert('No story.'); return; }
         if (currentStory.status==='completed') { alert('Completed.'); return; }
-        // Check if this flow is completed
-        const completedFlows = currentStory.completedFlows ? currentStory.completedFlows.split(',') : [];
-        if (currentFlowId && completedFlows.includes(currentFlowId)) {
-            alert('This flow is already completed. You cannot submit new sessions.');
-            return;
-        }
         const c = chapterText.value.trim();
         if (!c) { alert('Write something.'); return; }
         const wc = c.split(/\s+/).filter(w=>w.length>0).length;
@@ -620,15 +616,17 @@
     });
     async function loadWriterDesk() {
         if (!currentStory) { try { currentStory = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId); } catch (e) { alert('Error'); goToLanding(); return; } }
-        if (currentStory.status==='completed') { alert('This story is completed.'); window.goToStory(currentStoryId); return; }
+        if (currentStory.status==='completed') { alert('Completed.'); window.goToStory(currentStoryId); return; }
         if (currentStory.status==='archived') { alert('Archived.'); window.goToStory(currentStoryId); return; }
+
         // Check if the current flow is completed
         const completedFlows = currentStory.completedFlows ? currentStory.completedFlows.split(',') : [];
         if (currentFlowId && completedFlows.includes(currentFlowId)) {
-            alert('This flow is completed. Writing is no longer possible.');
+            alert(`This flow (${FLOW_NAMES[currentFlowId]}) is completed. You cannot write to it anymore.`);
             window.goToStory(currentStoryId);
             return;
         }
+
         const canManage = currentUser && (currentUser.isSuperAdmin || currentUser.isCoAdmin || currentUser.$id===currentStory.creatorId);
         const hasTurn = currentUser && currentUser.$id===currentStory.currentWriterId;
         let hasInvite = false;
@@ -652,7 +650,7 @@
     }
     async function loadPreviousSessions() { const pl = document.getElementById('prevChaptersList'); const lc = document.getElementById('lastSessionCard'); pl.innerHTML='Loading...'; lc.classList.add('hidden'); try { const q = [Appwrite.Query.equal('storyId', currentStoryId), Appwrite.Query.orderDesc('chapterNumber'), Appwrite.Query.limit(5)]; if (currentFlowId) q.push(Appwrite.Query.equal('flowId', currentFlowId)); const res = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, q); if (res.documents.length===0) { pl.innerHTML='<p>No sessions yet.</p>'; return; } const last = res.documents[0]; lc.classList.remove('hidden'); lc.innerHTML = `<h4>Last Session (${sessionLabel(last)}) — by ${last.authorName}</h4><p style="white-space:pre-wrap;${last.alignment ? 'text-align:'+last.alignment : ''}">${last.content}</p><small>${new Date(last.$createdAt).toLocaleString()}</small>`; pl.innerHTML = res.documents.length>1 ? '<h4>Earlier Sessions:</h4>'+res.documents.slice(1).map(c => `<div class="card" style="padding:0.8rem;font-size:0.85rem;"><strong>${sessionLabel(c)}</strong> — ${c.authorName}: ${c.content.substring(0,80)}...</div>`).join('') : ''; } catch (err) { pl.innerHTML='<p>Error.</p>'; } }
 
-    // ========== DASHBOARD (with per‑flow completion, order display, per‑flow publish) ==========
+    // ========== DASHBOARD (PER‑FLOW PUBLISH WORKS FOR COMPLETED FLOWS) ==========
     async function loadCreatorDashboard() {
         const le = document.getElementById('creatorStoriesList');
         if (!currentUser || currentUser.isGuest) { le.innerHTML = '<p>Please login.</p>'; return; }
@@ -746,7 +744,7 @@
         } catch (err) { alert('Error: ' + err.message); }
     };
 
-    // ========== PER‑BRANCH PUBLISH ==========
+    // ========== PER‑BRANCH PUBLISH (ALLOWS COMPLETED FLOWS TOO) ==========
     window.toggleBranchPublish = async function(storyId, flowId) {
         const story = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, storyId);
         let publishedBranches = story.publishedBranches ? story.publishedBranches.split(',') : [];
@@ -790,7 +788,7 @@
         } catch (err) { alert('Error: ' + err.message); }
     };
 
-    // ========== PREVIEW & STATIC MAGAZINE (UPDATED WITH PARCHMENT, CORRECT FLOW NUMBERS, BRANCHED SEPARATION, SMART LABELS, WIDER PAGE, NEW BACKGROUND) ==========
+    // ========== PREVIEW & STATIC MAGAZINE (WIDER, NO LABELS/STATUS) ==========
     window.previewMagazine = function() {
         window.open('https://your-username.github.io/your-repo/magazine.html', '_blank');
     };
@@ -831,7 +829,7 @@
             justify-content: center;
         }
         .magazine-wrapper {
-            max-width: 600px;
+            max-width: 640px;
             width: 100%;
         }
         h1 {
@@ -930,13 +928,6 @@
             margin-bottom: 1.5rem;
             white-space: pre-wrap;
         }
-        .session-label {
-            font-weight: bold;
-            display: block;
-            margin-bottom: 0.5rem;
-            font-style: italic;
-            opacity: 0.8;
-        }
         .story-end {
             text-align: center;
             font-style: italic;
@@ -965,78 +956,34 @@
 
             const isBranching = (story.isBranching === 'true' || story.isBranching === true);
             const publishedBranches = story.publishedBranches ? story.publishedBranches.split(',') : [];
-            // If no per-branch publish is set, fallback to global publish (all branches)
             const branchesToShow = (publishedBranches.length > 0) ? publishedBranches : FLOW_IDS;
 
             if (isBranching) {
-                // For each published flow, create a sub‑block
                 for (const flowId of branchesToShow) {
                     const flowChapters = chapters.filter(c => c.flowId === flowId);
                     if (flowChapters.length === 0) continue;
-                    // Prepend session 1 (common)
                     const session1 = chapters.find(c => c.chapterNumber === 1);
                     const allFlowChapters = session1 ? [session1, ...flowChapters] : flowChapters;
-
-                    // Check if all chapters in this flow are by the same author as the story's sole writer
-                    const storyAuthors = (story.writers || story.creatorName).split(',').map(w=>w.trim());
-                    const uniqueAuthorsInFlow = new Set(allFlowChapters.map(c=>c.authorName.trim()));
-                    const allSameAuthor = storyAuthors.length === 1 && uniqueAuthorsInFlow.size === 1 && uniqueAuthorsInFlow.has(storyAuthors[0]);
-                    // Single session check: if there's only one chapter, no label needed
-                    const singleSession = allFlowChapters.length === 1;
 
                     staticHTML += `<div class="story ${bgStyle}">`;
                     staticHTML += `<div class="story-title">${story.title} – ${flowId.slice(-1)}</div>`;
                     staticHTML += `<div class="story-authors">By ${story.writers || story.creatorName}</div>`;
 
-                    let prevAuthor = null;
-                    for (let i = 0; i < allFlowChapters.length; i++) {
-                        const ch = allFlowChapters[i];
+                    for (const ch of allFlowChapters) {
                         const alignment = ch.alignment || 'left';
-                        const currentAuthor = ch.authorName.trim();
-                        // If single session, no label at all
-                        if (singleSession) {
-                            staticHTML += `<div class="session" style="text-align: ${alignment};">${ch.content}</div>`;
-                        } else if (allSameAuthor) {
-                            // All same author – no session labels, just show content
-                            staticHTML += `<div class="session" style="text-align: ${alignment};">${ch.content}</div>`;
-                        } else if (i === 0 || currentAuthor !== prevAuthor) {
-                            staticHTML += `<div class="session" style="text-align: ${alignment};"><span class="session-label">Session ${ch.chapterNumber}/${flowId.slice(-1)} — by ${ch.authorName}</span>\n${ch.content}</div>`;
-                        } else {
-                            staticHTML += `<div class="session" style="text-align: ${alignment};">${ch.content}</div>`;
-                        }
-                        prevAuthor = currentAuthor;
+                        staticHTML += `<div class="session" style="text-align: ${alignment};">${ch.content}</div>`;
                     }
-                    staticHTML += `<div class="story-end">${story.status === 'completed' ? '🏁 The End' : '✍️ In Progress'}</div>`;
                     staticHTML += `</div>`;
                 }
             } else {
-                // Non‑branched
-                const storyAuthors = (story.writers || story.creatorName).split(',').map(w=>w.trim());
-                const uniqueAuthors = new Set(chapters.map(c=>c.authorName.trim()));
-                const allSameAuthor = storyAuthors.length === 1 && uniqueAuthors.size === 1 && uniqueAuthors.has(storyAuthors[0]);
-                const singleSession = chapters.length === 1;
-
                 staticHTML += `<div class="story ${bgStyle}">`;
                 staticHTML += `<div class="story-title">${story.title}</div>`;
                 staticHTML += `<div class="story-authors">By ${story.writers || story.creatorName}</div>`;
 
-                let prevAuthor = null;
-                for (let i = 0; i < chapters.length; i++) {
-                    const ch = chapters[i];
+                for (const ch of chapters) {
                     const alignment = ch.alignment || 'left';
-                    const currentAuthor = ch.authorName.trim();
-                    if (singleSession) {
-                        staticHTML += `<div class="session" style="text-align: ${alignment};">${ch.content}</div>`;
-                    } else if (allSameAuthor) {
-                        staticHTML += `<div class="session" style="text-align: ${alignment};">${ch.content}</div>`;
-                    } else if (i === 0 || currentAuthor !== prevAuthor) {
-                        staticHTML += `<div class="session" style="text-align: ${alignment};"><span class="session-label">Session ${ch.chapterNumber} — by ${ch.authorName}</span>\n${ch.content}</div>`;
-                    } else {
-                        staticHTML += `<div class="session" style="text-align: ${alignment};">${ch.content}</div>`;
-                    }
-                    prevAuthor = currentAuthor;
+                    staticHTML += `<div class="session" style="text-align: ${alignment};">${ch.content}</div>`;
                 }
-                staticHTML += `<div class="story-end">${story.status === 'completed' ? '🏁 The End' : '✍️ In Progress'}</div>`;
                 staticHTML += `</div>`;
             }
         }
