@@ -411,7 +411,7 @@
     window.closePopup = function() { document.getElementById('popupOverlay').classList.add('hidden'); document.getElementById('popupContent').classList.add('hidden'); };
     document.getElementById('popupOverlay').addEventListener('click', window.closePopup);
 
-    // ========== READ MODE (FIXED DUPLICATE SESSIONS + EDITABLE SESSION 1) ==========
+    // ========== READ MODE (FIXED DUPLICATE SESSIONS) ==========
     document.getElementById('readModeBtn').addEventListener('click', () => loadReadMode(currentFlowId));
 
     async function loadReadMode(flowId) {
@@ -788,7 +788,7 @@
         } catch (err) { alert('Error: ' + err.message); }
     };
 
-    // ========== PREVIEW & STATIC MAGAZINE (WIDER, NO LABELS/STATUS) ==========
+    // ========== PREVIEW & STATIC MAGAZINE (WIDER, AUTHOR OPTIONAL, NO LABELS) ==========
     window.previewMagazine = function() {
         window.open('https://your-username.github.io/your-repo/magazine.html', '_blank');
     };
@@ -798,6 +798,7 @@
         const heading = prompt('Magazine heading:', 'RelayTale Monthly') || 'RelayTale Monthly';
         const subheading = prompt('Magazine subheading:', 'Where Writers Create Stories By Turn') || 'Where Writers Create Stories By Turn';
         const background = prompt('Background style: "leather", "parchment", or "agedbook"', 'leather');
+        const includeAuthor = confirm('Include "By author name" under each title?');
         const bgStyle = background || 'leather';
 
         const client = new Appwrite.Client();
@@ -829,7 +830,7 @@
             justify-content: center;
         }
         .magazine-wrapper {
-            max-width: 640px;
+            max-width: 690px;
             width: 100%;
         }
         h1 {
@@ -967,7 +968,7 @@
 
                     staticHTML += `<div class="story ${bgStyle}">`;
                     staticHTML += `<div class="story-title">${story.title} – ${flowId.slice(-1)}</div>`;
-                    staticHTML += `<div class="story-authors">By ${story.writers || story.creatorName}</div>`;
+                    if (includeAuthor) staticHTML += `<div class="story-authors">By ${story.writers || story.creatorName}</div>`;
 
                     for (const ch of allFlowChapters) {
                         const alignment = ch.alignment || 'left';
@@ -978,7 +979,7 @@
             } else {
                 staticHTML += `<div class="story ${bgStyle}">`;
                 staticHTML += `<div class="story-title">${story.title}</div>`;
-                staticHTML += `<div class="story-authors">By ${story.writers || story.creatorName}</div>`;
+                if (includeAuthor) staticHTML += `<div class="story-authors">By ${story.writers || story.creatorName}</div>`;
 
                 for (const ch of chapters) {
                     const alignment = ch.alignment || 'left';
