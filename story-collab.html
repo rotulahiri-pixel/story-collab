@@ -80,6 +80,8 @@
         .align-dropdown { margin-left: 0.5rem; padding: 0.3rem 0.5rem; border-radius: 4px; border: 1px solid #ddd; }
         .push-btn { background: #8e44ad; color: white; border: none; }
         .push-btn:hover { background: #9b59b6; }
+        /* Wider edit area */
+        .edit-fullscreen textarea { max-width: 740px; margin: 0 auto; display: block; }
     </style>
 </head>
 <body>
@@ -213,6 +215,17 @@
     let currentStory = null;
     let currentFlowId = null;
     let disclaimerAccepted = false;
+
+    // ========== CONTENT NORMALISATION ==========
+    function normalizeContent(content, alignment) {
+        if (alignment === 'left') {
+            // Remove single newlines (join lines inside a paragraph)
+            // Preserve double newlines as paragraph breaks
+            return content.replace(/\n{2,}/g, '\n\n').replace(/\n/g, ' ');
+        }
+        // For center/right aligned (poems), preserve line breaks
+        return content;
+    }
 
     // ========== DISCLAIMER ==========
     function acceptDisclaimer() { disclaimerAccepted = true; document.getElementById('disclaimerOverlay').classList.add('hidden'); document.getElementById('disclaimerPopup').classList.add('hidden'); }
@@ -411,7 +424,7 @@
     window.closePopup = function() { document.getElementById('popupOverlay').classList.add('hidden'); document.getElementById('popupContent').classList.add('hidden'); };
     document.getElementById('popupOverlay').addEventListener('click', window.closePopup);
 
-    // ========== READ MODE (FIXED DUPLICATE SESSIONS – robust filter) ==========
+    // ========== READ MODE (FIXED DUPLICATE SESSIONS) ==========
     document.getElementById('readModeBtn').addEventListener('click', () => loadReadMode(currentFlowId));
 
     async function loadReadMode(flowId) {
@@ -444,7 +457,7 @@
                         Appwrite.Query.equal('flowId', flowId),
                         Appwrite.Query.orderAsc('chapterNumber')
                     ]);
-                    // ALWAYS exclude Session 1, no matter what flowId it has
+                    // ALWAYS exclude Session 1
                     const flowChapters = chRes.documents.filter(c => c.chapterNumber !== 1);
                     if (flowChapters.length === 0) {
                         html += '<p style="text-align:center;margin-top:1rem;">No sessions in this flow yet.</p>';
@@ -460,7 +473,6 @@
                     Appwrite.Query.equal('storyId', currentStoryId),
                     Appwrite.Query.orderAsc('chapterNumber')
                 ]);
-                // For non-branched, also remove any chapter 1 from the main list, but we already showed it above.
                 const nonBranchChapters = chRes.documents.filter(c => c.chapterNumber !== 1);
                 nonBranchChapters.forEach(c => {
                     html += `<div class="session"><p class="session-author">${sessionLabel(c)} — ${c.authorName}</p><p style="white-space:pre-wrap;${c.alignment ? 'text-align:'+c.alignment : ''}">${c.content}</p></div>`;
@@ -555,7 +567,21 @@
     window.submitComment = async function(sid) { const inp = document.getElementById('quickComment'); if (!inp) return; const c = inp.value.trim(); if (!c) { alert('Write a comment.'); return; } if (c.split(/\s+/).filter(w=>w.length>0).length > MAX_COMMENT_WORDS) { alert(`Max ${MAX_COMMENT_WORDS} words.`); return; } try { await databases.createDocument(DATABASE_ID, COMMENTS_COLLECTION, Appwrite.ID.unique(), { storyId: sid, userId: currentUser.$id, userName: currentUser.name||'Writer', content: c }); inp.value = ''; loadStoryView(); } catch (err) { alert('Error: '+err.message); } };
     window.editStoryDetails = async function(sid) { const s = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, sid); const t = prompt("Edit title:", s.title); if (t===null) return; const g = prompt("Edit genre:", s.genre||''); const d = prompt("Edit description:", s.description||''); try { await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, sid, { title:t||s.title, genre:g!==null?g:s.genre, description:d!==null?d:s.description }); alert('Updated!'); loadStoryView(); } catch (err) { alert('Error: '+err.message); } };
     window.editSessionFullscreen = function(sid, storyId) { (async () => { try { const s = await databases.getDocument(DATABASE_ID, CHAPTERS_COLLECTION, sid); const ed = document.getElementById('editFullscreen'); ed.innerHTML = `<div style="max-width:800px;margin:0 auto;"><h2>Edit Session</h2><div class="word-counter"><span>Words: <strong id="editWordCount">0</strong>/${MAX_WORDS}</span><div class="progress-bar"><div id="editWordProgress" class="progress-fill" style="width:0%"></div></div></div><textarea id="editTextarea" rows="20" style="width:100%;">${s.content}</textarea><p id="editWarning" class="warning hidden">⚠️ Too many words.</p><div style="margin-top:1rem;"><button onclick="saveEdit('${sid}','${storyId}')" class="success">💾 Save</button><button onclick="closeEdit()" class="danger">Cancel</button></div></div>`; ed.classList.remove('hidden'); const ta = document.getElementById('editTextarea'); ta.addEventListener('input', () => { const w = ta.value.trim().split(/\s+/).filter(x=>x.length>0); document.getElementById('editWordCount').textContent = w.length; const p = Math.min((w.length/MAX_WORDS)*100,100); document.getElementById('editWordProgress').style.width = p+'%'; document.getElementById('editWordProgress').classList.toggle('over-limit', w.length>MAX_WORDS); document.getElementById('editWarning').classList.toggle('hidden', w.length<=MAX_WORDS); }); ta.dispatchEvent(new Event('input')); } catch (e) {} })(); };
-    window.saveEdit = async function(sid, storyId) { const c = document.getElementById('editTextarea').value.trim(); if (!c) { alert('Cannot be empty.'); return; } const wc = c.split(/\s+/).filter(w=>w.length>0).length; if (wc>MAX_WORDS) { alert(`Max ${MAX_WORDS} words.`); return; } try { await databases.updateDocument(DATABASE_ID, CHAPTERS_COLLECTION, sid, { content:c, wordCount:wc }); document.getElementById('editFullscreen').classList.add('hidden'); alert('Saved!'); loadStoryView(); } catch (err) { alert('Error: '+err.message); } };
+    window.saveEdit = async function(sid, storyId) {
+        const c = document.getElementById('editTextarea').value.trim();
+        if (!c) { alert('Cannot be empty.'); return; }
+        const wc = c.split(/\s+/).filter(w=>w.length>0).length;
+        if (wc>MAX_WORDS) { alert(`Max ${MAX_WORDS} words.`); return; }
+        // Apply same normalization as submit – default alignment left if not set
+        const alignment = 'left';
+        const normalizedContent = normalizeContent(c, alignment);
+        try {
+            await databases.updateDocument(DATABASE_ID, CHAPTERS_COLLECTION, sid, { content: normalizedContent, wordCount: wc });
+            document.getElementById('editFullscreen').classList.add('hidden');
+            alert('Saved!');
+            loadStoryView();
+        } catch (err) { alert('Error: '+err.message); }
+    };
     window.closeEdit = function() { document.getElementById('editFullscreen').classList.add('hidden'); };
 
     // ========== INVITES (unchanged) ==========
@@ -578,7 +604,7 @@
     }
     window.assignTurn = async function(invId, id) { if (currentStory.status==='completed') { alert('Completed.'); return; } try { await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId, { currentWriterId: invId }); const cw = (currentStory.writers||currentStory.creatorName); const nw = cw.split(',').includes(id)?cw:cw+','+id; await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId, { writers: nw }); alert(`Turn to ${id}!`); currentStory = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId); loadStoryView(); loadInvites(); } catch (err) { alert('Error: '+err.message); } };
 
-    // ========== WRITER'S DESK (CHECKS FOR COMPLETED FLOWS) ==========
+    // ========== WRITER'S DESK (with normalization) ==========
     document.getElementById('backToStoryBtn').addEventListener('click', () => { if (currentStoryId) window.goToStory(currentStoryId); });
     const chapterText = document.getElementById('chapterText');
     // Live alignment preview
@@ -595,11 +621,12 @@
         const wc = c.split(/\s+/).filter(w=>w.length>0).length;
         if (wc>MAX_WORDS) { alert(`Max ${MAX_WORDS} words.`); return; }
         const alignment = document.getElementById('alignmentSelect').value || 'left';
+        const normalizedContent = normalizeContent(c, alignment);
         try {
             const cr = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, [Appwrite.Query.equal('storyId', currentStoryId)]);
             const nn = cr.documents.length+1;
             await databases.createDocument(DATABASE_ID, CHAPTERS_COLLECTION, Appwrite.ID.unique(), {
-                storyId: currentStoryId, chapterNumber: nn, content:c,
+                storyId: currentStoryId, chapterNumber: nn, content: normalizedContent,
                 authorId: currentUser.$id, authorName: currentUser.name||'Writer',
                 wordCount:wc, status:'published', flowId: currentFlowId||null,
                 alignment: alignment
@@ -652,7 +679,7 @@
     }
     async function loadPreviousSessions() { const pl = document.getElementById('prevChaptersList'); const lc = document.getElementById('lastSessionCard'); pl.innerHTML='Loading...'; lc.classList.add('hidden'); try { const q = [Appwrite.Query.equal('storyId', currentStoryId), Appwrite.Query.orderDesc('chapterNumber'), Appwrite.Query.limit(5)]; if (currentFlowId) q.push(Appwrite.Query.equal('flowId', currentFlowId)); const res = await databases.listDocuments(DATABASE_ID, CHAPTERS_COLLECTION, q); if (res.documents.length===0) { pl.innerHTML='<p>No sessions yet.</p>'; return; } const last = res.documents[0]; lc.classList.remove('hidden'); lc.innerHTML = `<h4>Last Session (${sessionLabel(last)}) — by ${last.authorName}</h4><p style="white-space:pre-wrap;${last.alignment ? 'text-align:'+last.alignment : ''}">${last.content}</p><small>${new Date(last.$createdAt).toLocaleString()}</small>`; pl.innerHTML = res.documents.length>1 ? '<h4>Earlier Sessions:</h4>'+res.documents.slice(1).map(c => `<div class="card" style="padding:0.8rem;font-size:0.85rem;"><strong>${sessionLabel(c)}</strong> — ${c.authorName}: ${c.content.substring(0,80)}...</div>`).join('') : ''; } catch (err) { pl.innerHTML='<p>Error.</p>'; } }
 
-    // ========== DASHBOARD (PER‑FLOW PUBLISH WORKS FOR COMPLETED FLOWS) ==========
+    // ========== DASHBOARD (unchanged) ==========
     async function loadCreatorDashboard() {
         const le = document.getElementById('creatorStoriesList');
         if (!currentUser || currentUser.isGuest) { le.innerHTML = '<p>Please login.</p>'; return; }
@@ -733,7 +760,6 @@
                 await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, storyId, {
                     completedFlows: completedFlows.join(',')
                 });
-                // If all three flows completed, set story status to completed
                 if (completedFlows.length >= 3) {
                     await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, storyId, {
                         status: 'completed',
@@ -746,7 +772,7 @@
         } catch (err) { alert('Error: ' + err.message); }
     };
 
-    // ========== PER‑BRANCH PUBLISH (ALLOWS COMPLETED FLOWS TOO) ==========
+    // ========== PER‑BRANCH PUBLISH ==========
     window.toggleBranchPublish = async function(storyId, flowId) {
         const story = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, storyId);
         let publishedBranches = story.publishedBranches ? story.publishedBranches.split(',') : [];
@@ -796,7 +822,6 @@
     };
 
     window.downloadStaticMagazine = async function() {
-        // Prompt for heading and subheading
         const heading = prompt('Magazine heading:', 'RelayTale Monthly') || 'RelayTale Monthly';
         const subheading = prompt('Magazine subheading:', 'Where Writers Create Stories By Turn') || 'Where Writers Create Stories By Turn';
         const background = prompt('Background style: "leather", "parchment", or "agedbook"', 'leather');
@@ -815,7 +840,6 @@
             return;
         }
 
-        // Build static HTML
         let staticHTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -856,13 +880,11 @@
             border-radius: 6px;
             position: relative;
         }
-        /* Leather background */
         .leather {
             background: linear-gradient(135deg, #5a2d1a 0%, #3c1e0f 40%, #2a1005 100%);
             box-shadow: 0 4px 20px rgba(0,0,0,0.5);
             color: #f5f0e8;
         }
-        /* Parchment background */
         .parchment {
             background: #f5e6c8;
             color: #3c2416;
@@ -885,7 +907,6 @@
             background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 20"><path d="M0,10 Q10,0 20,10 T40,10 T60,10 T80,10 T100,10 T120,10 T140,10 T160,10 T180,10 T200,10" fill="none" stroke="%23c4a46c" stroke-width="2"/></svg>') repeat-x;
             opacity: 0.6;
         }
-        /* Aged Book background */
         .agedbook {
             background: #f4e4c1;
             color: #3c2416;
@@ -993,7 +1014,6 @@
 
         staticHTML += `</div></body></html>`;
 
-        // Trigger download
         const blob = new Blob([staticHTML], { type: 'text/html' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
