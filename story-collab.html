@@ -411,7 +411,7 @@
     window.closePopup = function() { document.getElementById('popupOverlay').classList.add('hidden'); document.getElementById('popupContent').classList.add('hidden'); };
     document.getElementById('popupOverlay').addEventListener('click', window.closePopup);
 
-    // ========== READ MODE (FIXED DUPLICATE SESSIONS) ==========
+    // ========== READ MODE (FIXED DUPLICATE SESSIONS – robust filter) ==========
     document.getElementById('readModeBtn').addEventListener('click', () => loadReadMode(currentFlowId));
 
     async function loadReadMode(flowId) {
@@ -444,7 +444,7 @@
                         Appwrite.Query.equal('flowId', flowId),
                         Appwrite.Query.orderAsc('chapterNumber')
                     ]);
-                    // Filter out Session 1 (it's already displayed)
+                    // ALWAYS exclude Session 1, no matter what flowId it has
                     const flowChapters = chRes.documents.filter(c => c.chapterNumber !== 1);
                     if (flowChapters.length === 0) {
                         html += '<p style="text-align:center;margin-top:1rem;">No sessions in this flow yet.</p>';
@@ -460,7 +460,9 @@
                     Appwrite.Query.equal('storyId', currentStoryId),
                     Appwrite.Query.orderAsc('chapterNumber')
                 ]);
-                chRes.documents.forEach(c => {
+                // For non-branched, also remove any chapter 1 from the main list, but we already showed it above.
+                const nonBranchChapters = chRes.documents.filter(c => c.chapterNumber !== 1);
+                nonBranchChapters.forEach(c => {
                     html += `<div class="session"><p class="session-author">${sessionLabel(c)} — ${c.authorName}</p><p style="white-space:pre-wrap;${c.alignment ? 'text-align:'+c.alignment : ''}">${c.content}</p></div>`;
                 });
             }
@@ -830,7 +832,7 @@
             justify-content: center;
         }
         .magazine-wrapper {
-            max-width: 690px;
+            max-width: 740px;
             width: 100%;
         }
         h1 {
