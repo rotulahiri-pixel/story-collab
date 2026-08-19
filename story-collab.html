@@ -217,18 +217,15 @@
 
     // ========== CONTENT NORMALISATION (CORRECTED) ==========
     function normalizeContent(content, alignment) {
-        // Always preserve double newlines (paragraph breaks)
+        // Poems (center/right) keep every line break
         if (alignment === 'center' || alignment === 'right') {
-            // Poems: keep every line break exactly as entered
             return content;
         }
-        // Left-aligned prose:
-        // - keep double newlines as paragraph breaks
-        // - join single newlines into spaces (soft wraps)
+        // Left-aligned prose: keep paragraph breaks (double newlines), join soft wraps
         return content
-            .replace(/\n{2,}/g, '\u0001')      // temporary marker for paragraph break
-            .replace(/\n/g, ' ')               // single newlines -> spaces
-            .replace(/\u0001/g, '\n\n');       // restore paragraph breaks
+            .replace(/\n{2,}/g, '\u0001')
+            .replace(/\n/g, ' ')
+            .replace(/\u0001/g, '\n\n');
     }
 
     // ========== DISCLAIMER ==========
@@ -569,18 +566,49 @@
     window.toggleLike = async function(sid) { if (!currentUser || currentUser.isGuest) { alert('Please login.'); return; } try { const ex = await databases.listDocuments(DATABASE_ID, LIKES_COLLECTION, [Appwrite.Query.equal('storyId', sid), Appwrite.Query.equal('userId', currentUser.$id)]); if (ex.documents.length > 0) await databases.deleteDocument(DATABASE_ID, LIKES_COLLECTION, ex.documents[0].$id); else await databases.createDocument(DATABASE_ID, LIKES_COLLECTION, Appwrite.ID.unique(), { storyId: sid, userId: currentUser.$id }); loadStoryView(); } catch (err) { console.error(err); } };
     window.submitComment = async function(sid) { const inp = document.getElementById('quickComment'); if (!inp) return; const c = inp.value.trim(); if (!c) { alert('Write a comment.'); return; } if (c.split(/\s+/).filter(w=>w.length>0).length > MAX_COMMENT_WORDS) { alert(`Max ${MAX_COMMENT_WORDS} words.`); return; } try { await databases.createDocument(DATABASE_ID, COMMENTS_COLLECTION, Appwrite.ID.unique(), { storyId: sid, userId: currentUser.$id, userName: currentUser.name||'Writer', content: c }); inp.value = ''; loadStoryView(); } catch (err) { alert('Error: '+err.message); } };
     window.editStoryDetails = async function(sid) { const s = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, sid); const t = prompt("Edit title:", s.title); if (t===null) return; const g = prompt("Edit genre:", s.genre||''); const d = prompt("Edit description:", s.description||''); try { await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, sid, { title:t||s.title, genre:g!==null?g:s.genre, description:d!==null?d:s.description }); alert('Updated!'); loadStoryView(); } catch (err) { alert('Error: '+err.message); } };
-    window.editSessionFullscreen = function(sid, storyId) { (async () => { try { const s = await databases.getDocument(DATABASE_ID, CHAPTERS_COLLECTION, sid); const ed = document.getElementById('editFullscreen'); ed.innerHTML = `<div style="max-width:800px;margin:0 auto;"><h2>Edit Session</h2><div class="word-counter"><span>Words: <strong id="editWordCount">0</strong>/${MAX_WORDS}</span><div class="progress-bar"><div id="editWordProgress" class="progress-fill" style="width:0%"></div></div></div><textarea id="editTextarea" rows="20" style="width:100%;">${s.content}</textarea><p id="editWarning" class="warning hidden">⚠️ Too many words.</p><div style="margin-top:1rem;"><button onclick="saveEdit('${sid}','${storyId}')" class="success">💾 Save</button><button onclick="closeEdit()" class="danger">Cancel</button></div></div>`; ed.classList.remove('hidden'); const ta = document.getElementById('editTextarea'); ta.addEventListener('input', () => { const w = ta.value.trim().split(/\s+/).filter(x=>x.length>0); document.getElementById('editWordCount').textContent = w.length; const p = Math.min((w.length/MAX_WORDS)*100,100); document.getElementById('editWordProgress').style.width = p+'%'; document.getElementById('editWordProgress').classList.toggle('over-limit', w.length>MAX_WORDS); document.getElementById('editWarning').classList.toggle('hidden', w.length<=MAX_WORDS); }); ta.dispatchEvent(new Event('input')); } catch (e) {} })(); };
+    window.editSessionFullscreen = function(sid, storyId) {
+        (async () => {
+            try {
+                const s = await databases.getDocument(DATABASE_ID, CHAPTERS_COLLECTION, sid);
+                const ed = document.getElementById('editFullscreen');
+                ed.innerHTML = `<div style="max-width:800px;margin:0 auto;"><h2>Edit Session</h2>
+                <div class="word-counter"><span>Words: <strong id="editWordCount">0</strong>/${MAX_WORDS}</span><div class="progress-bar"><div id="editWordProgress" class="progress-fill" style="width:0%"></div></div></div>
+                <select id="editAlignmentSelect" style="margin-bottom:0.5rem;">
+                    <option value="left" ${s.alignment === 'left' ? 'selected' : ''}>⬅️ Left</option>
+                    <option value="center" ${s.alignment === 'center' ? 'selected' : ''}>⬛ Center</option>
+                    <option value="right" ${s.alignment === 'right' ? 'selected' : ''}>➡️ Right</option>
+                </select>
+                <textarea id="editTextarea" rows="20" style="width:100%;">${s.content}</textarea>
+                <p id="editWarning" class="warning hidden">⚠️ Too many words.</p>
+                <div style="margin-top:1rem;"><button onclick="saveEdit('${sid}','${storyId}')" class="success">💾 Save</button><button onclick="closeEdit()" class="danger">Cancel</button></div></div>`;
+                ed.classList.remove('hidden');
+                const ta = document.getElementById('editTextarea');
+                const alSel = document.getElementById('editAlignmentSelect');
+                ta.style.textAlign = alSel.value;
+                alSel.addEventListener('change', function() {
+                    ta.style.textAlign = this.value;
+                });
+                ta.addEventListener('input', () => {
+                    const w = ta.value.trim().split(/\s+/).filter(x=>x.length>0);
+                    document.getElementById('editWordCount').textContent = w.length;
+                    const p = Math.min((w.length/MAX_WORDS)*100,100);
+                    document.getElementById('editWordProgress').style.width = p+'%';
+                    document.getElementById('editWordProgress').classList.toggle('over-limit', w.length>MAX_WORDS);
+                    document.getElementById('editWarning').classList.toggle('hidden', w.length<=MAX_WORDS);
+                });
+                ta.dispatchEvent(new Event('input'));
+            } catch (e) { console.error(e); }
+        })();
+    };
     window.saveEdit = async function(sid, storyId) {
         const c = document.getElementById('editTextarea').value.trim();
         if (!c) { alert('Cannot be empty.'); return; }
         const wc = c.split(/\s+/).filter(w=>w.length>0).length;
         if (wc>MAX_WORDS) { alert(`Max ${MAX_WORDS} words.`); return; }
-        // Fetch the chapter's alignment (important!)
-        const chapter = await databases.getDocument(DATABASE_ID, CHAPTERS_COLLECTION, sid);
-        const alignment = chapter.alignment || 'left';
+        const alignment = document.getElementById('editAlignmentSelect').value || 'left';
         const normalizedContent = normalizeContent(c, alignment);
         try {
-            await databases.updateDocument(DATABASE_ID, CHAPTERS_COLLECTION, sid, { content: normalizedContent, wordCount: wc });
+            await databases.updateDocument(DATABASE_ID, CHAPTERS_COLLECTION, sid, { content: normalizedContent, wordCount: wc, alignment: alignment });
             document.getElementById('editFullscreen').classList.add('hidden');
             alert('Saved!');
             loadStoryView();
@@ -608,7 +636,7 @@
     }
     window.assignTurn = async function(invId, id) { if (currentStory.status==='completed') { alert('Completed.'); return; } try { await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId, { currentWriterId: invId }); const cw = (currentStory.writers||currentStory.creatorName); const nw = cw.split(',').includes(id)?cw:cw+','+id; await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId, { writers: nw }); alert(`Turn to ${id}!`); currentStory = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId); loadStoryView(); loadInvites(); } catch (err) { alert('Error: '+err.message); } };
 
-    // ========== WRITER'S DESK (with alignment-aware normalisation) ==========
+    // ========== WRITER'S DESK (with normalization) ==========
     document.getElementById('backToStoryBtn').addEventListener('click', () => { if (currentStoryId) window.goToStory(currentStoryId); });
     const chapterText = document.getElementById('chapterText');
     document.getElementById('alignmentSelect').addEventListener('change', function() {
