@@ -80,7 +80,6 @@
         .align-dropdown { margin-left: 0.5rem; padding: 0.3rem 0.5rem; border-radius: 4px; border: 1px solid #ddd; }
         .push-btn { background: #8e44ad; color: white; border: none; }
         .push-btn:hover { background: #9b59b6; }
-        /* Wider edit area */
         .edit-fullscreen textarea { max-width: 740px; margin: 0 auto; display: block; }
     </style>
 </head>
@@ -216,15 +215,20 @@
     let currentFlowId = null;
     let disclaimerAccepted = false;
 
-    // ========== CONTENT NORMALISATION ==========
+    // ========== CONTENT NORMALISATION (CORRECTED) ==========
     function normalizeContent(content, alignment) {
-        if (alignment === 'left') {
-            // Remove single newlines (join lines inside a paragraph)
-            // Preserve double newlines as paragraph breaks
-            return content.replace(/\n{2,}/g, '\n\n').replace(/\n/g, ' ');
+        // Always preserve double newlines (paragraph breaks)
+        if (alignment === 'center' || alignment === 'right') {
+            // Poems: keep every line break exactly as entered
+            return content;
         }
-        // For center/right aligned (poems), preserve line breaks
-        return content;
+        // Left-aligned prose:
+        // - keep double newlines as paragraph breaks
+        // - join single newlines into spaces (soft wraps)
+        return content
+            .replace(/\n{2,}/g, '\u0001')      // temporary marker for paragraph break
+            .replace(/\n/g, ' ')               // single newlines -> spaces
+            .replace(/\u0001/g, '\n\n');       // restore paragraph breaks
     }
 
     // ========== DISCLAIMER ==========
@@ -457,7 +461,6 @@
                         Appwrite.Query.equal('flowId', flowId),
                         Appwrite.Query.orderAsc('chapterNumber')
                     ]);
-                    // ALWAYS exclude Session 1
                     const flowChapters = chRes.documents.filter(c => c.chapterNumber !== 1);
                     if (flowChapters.length === 0) {
                         html += '<p style="text-align:center;margin-top:1rem;">No sessions in this flow yet.</p>';
@@ -572,8 +575,9 @@
         if (!c) { alert('Cannot be empty.'); return; }
         const wc = c.split(/\s+/).filter(w=>w.length>0).length;
         if (wc>MAX_WORDS) { alert(`Max ${MAX_WORDS} words.`); return; }
-        // Apply same normalization as submit – default alignment left if not set
-        const alignment = 'left';
+        // Fetch the chapter's alignment (important!)
+        const chapter = await databases.getDocument(DATABASE_ID, CHAPTERS_COLLECTION, sid);
+        const alignment = chapter.alignment || 'left';
         const normalizedContent = normalizeContent(c, alignment);
         try {
             await databases.updateDocument(DATABASE_ID, CHAPTERS_COLLECTION, sid, { content: normalizedContent, wordCount: wc });
@@ -604,10 +608,9 @@
     }
     window.assignTurn = async function(invId, id) { if (currentStory.status==='completed') { alert('Completed.'); return; } try { await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId, { currentWriterId: invId }); const cw = (currentStory.writers||currentStory.creatorName); const nw = cw.split(',').includes(id)?cw:cw+','+id; await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId, { writers: nw }); alert(`Turn to ${id}!`); currentStory = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId); loadStoryView(); loadInvites(); } catch (err) { alert('Error: '+err.message); } };
 
-    // ========== WRITER'S DESK (with normalization) ==========
+    // ========== WRITER'S DESK (with alignment-aware normalisation) ==========
     document.getElementById('backToStoryBtn').addEventListener('click', () => { if (currentStoryId) window.goToStory(currentStoryId); });
     const chapterText = document.getElementById('chapterText');
-    // Live alignment preview
     document.getElementById('alignmentSelect').addEventListener('change', function() {
         chapterText.style.textAlign = this.value;
     });
@@ -648,7 +651,6 @@
         if (currentStory.status==='completed') { alert('Completed.'); window.goToStory(currentStoryId); return; }
         if (currentStory.status==='archived') { alert('Archived.'); window.goToStory(currentStoryId); return; }
 
-        // Check if the current flow is completed
         const completedFlows = currentStory.completedFlows ? currentStory.completedFlows.split(',') : [];
         if (currentFlowId && completedFlows.includes(currentFlowId)) {
             alert(`This flow (${FLOW_NAMES[currentFlowId]}) is completed. You cannot write to it anymore.`);
@@ -816,7 +818,7 @@
         } catch (err) { alert('Error: ' + err.message); }
     };
 
-    // ========== PREVIEW & STATIC MAGAZINE (WIDER, AUTHOR OPTIONAL, NO LABELS) ==========
+    // ========== PREVIEW & STATIC MAGAZINE ==========
     window.previewMagazine = function() {
         window.open('https://your-username.github.io/your-repo/magazine.html', '_blank');
     };
