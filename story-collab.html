@@ -215,13 +215,11 @@
     let currentFlowId = null;
     let disclaimerAccepted = false;
 
-    // ========== CONTENT NORMALISATION (CORRECTED) ==========
+    // ========== CONTENT NORMALISATION (only for new submissions) ==========
     function normalizeContent(content, alignment) {
-        // Poems (center/right) keep every line break
         if (alignment === 'center' || alignment === 'right') {
             return content;
         }
-        // Left-aligned prose: keep paragraph breaks (double newlines), join soft wraps
         return content
             .replace(/\n{2,}/g, '\u0001')
             .replace(/\n/g, ' ')
@@ -606,9 +604,13 @@
         const wc = c.split(/\s+/).filter(w=>w.length>0).length;
         if (wc>MAX_WORDS) { alert(`Max ${MAX_WORDS} words.`); return; }
         const alignment = document.getElementById('editAlignmentSelect').value || 'left';
-        const normalizedContent = normalizeContent(c, alignment);
+        // DO NOT normalize on edit – preserve the exact textarea content
         try {
-            await databases.updateDocument(DATABASE_ID, CHAPTERS_COLLECTION, sid, { content: normalizedContent, wordCount: wc, alignment: alignment });
+            await databases.updateDocument(DATABASE_ID, CHAPTERS_COLLECTION, sid, {
+                content: c,
+                wordCount: wc,
+                alignment: alignment
+            });
             document.getElementById('editFullscreen').classList.add('hidden');
             alert('Saved!');
             loadStoryView();
@@ -636,7 +638,7 @@
     }
     window.assignTurn = async function(invId, id) { if (currentStory.status==='completed') { alert('Completed.'); return; } try { await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId, { currentWriterId: invId }); const cw = (currentStory.writers||currentStory.creatorName); const nw = cw.split(',').includes(id)?cw:cw+','+id; await databases.updateDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId, { writers: nw }); alert(`Turn to ${id}!`); currentStory = await databases.getDocument(DATABASE_ID, STORIES_COLLECTION, currentStoryId); loadStoryView(); loadInvites(); } catch (err) { alert('Error: '+err.message); } };
 
-    // ========== WRITER'S DESK (with normalization) ==========
+    // ========== WRITER'S DESK (with normalization for new submissions only) ==========
     document.getElementById('backToStoryBtn').addEventListener('click', () => { if (currentStoryId) window.goToStory(currentStoryId); });
     const chapterText = document.getElementById('chapterText');
     document.getElementById('alignmentSelect').addEventListener('change', function() {
